@@ -1,0 +1,104 @@
+shieldpass-frontend/
+├── public/
+│   └── favicon.svg
+├── src/
+│   ├── circuits/
+│   │   └── kyc_proof.json              # compiled Noir circuit (copied from circuits/kyc_proof/target)
+│   │
+│   ├── assets/
+│   │   └── logo.svg
+│   │
+│   ├── components/
+│   │   ├── layout/
+│   │   │   ├── Header.tsx
+│   │   │   ├── Footer.tsx
+│   │   │   └── PageContainer.tsx
+│   │   ├── wallet/
+│   │   │   ├── WalletConnectButton.tsx     # wraps Stellar Wallets Kit / Freighter
+│   │   │   └── WalletStatusBadge.tsx
+│   │   ├── kyc/
+│   │   │   ├── KycForm.tsx                 # name, DOB, country
+│   │   │   ├── DocumentUploadMock.tsx       # fake doc upload, auto-approve
+│   │   │   └── IssuanceLoadingState.tsx     # "Generating your compliance pass…"
+│   │   ├── proof/
+│   │   │   ├── ProofGenerator.tsx           # orchestrates the Web Worker proving step
+│   │   │   ├── ProofProgressIndicator.tsx   # "Generating proof locally — never leaves your device"
+│   │   │   └── VerificationStepTracker.tsx  # proving → verifying → confirmed
+│   │   ├── payment/
+│   │   │   ├── PaymentForm.tsx              # recipient, amount, asset
+│   │   │   ├── PaymentStatusTracker.tsx      # polls /payments/:id/status
+│   │   │   └── TransactionExplorerLink.tsx   # links to Stellar Expert testnet
+│   │   ├── dashboard/
+│   │   │   ├── PassStatusCard.tsx           # status + expiry
+│   │   │   └── PaymentHistoryTable.tsx
+│   │   └── common/
+│   │       ├── Button.tsx
+│   │       ├── Input.tsx
+│   │       ├── Card.tsx
+│   │       ├── Spinner.tsx
+│   │       └── Badge.tsx
+│   │
+│   ├── pages/
+│   │   ├── LandingPage.tsx              # privacy pitch + Connect Wallet CTA
+│   │   ├── OnboardingPage.tsx           # mock KYC → pass issuance flow
+│   │   ├── PaymentPage.tsx              # send/receive + proof flow
+│   │   ├── DashboardPage.tsx            # pass status, expiry, history
+│   │   └── NotFoundPage.tsx
+│   │
+│   ├── hooks/
+│   │   ├── useWallet.ts                 # connect/sign via kit
+│   │   ├── useAuth.ts                   # challenge/verify/JWT flow
+│   │   ├── useKycSubmission.ts
+│   │   ├── useComplianceAttestation.ts  # fetch salt/path/leafIndex once
+│   │   ├── useProofGeneration.ts        # drives the worker, exposes progress state
+│   │   └── usePaymentStatus.ts          # React Query polling hook
+│   │
+│   ├── workers/
+│   │   └── proof.worker.ts              # bb.js UltraHonkBackend runs here, off main thread
+│   │
+│   ├── lib/
+│   │   ├── api/
+│   │   │   ├── apiClient.ts             # base fetch/axios instance, JWT attach
+│   │   │   ├── authApi.ts               # /auth/challenge, /auth/verify
+│   │   │   ├── kycApi.ts                # /kyc/submit, /kyc/status
+│   │   │   ├── complianceApi.ts         # /compliance/issue-attestation, /compliance/root
+│   │   │   └── paymentsApi.ts           # /payments/initiate, /payments/:id/status
+│   │   ├── stellar/
+│   │   │   ├── walletKit.ts             # StellarWalletsKit init (FREIGHTER_ID, TESTNET)
+│   │   │   └── stellarClient.ts         # tx building/signing helpers, Horizon/RPC calls
+│   │   ├── zk/
+│   │   │   ├── proverClient.ts          # wraps backend.generateProof(witnessInputs)
+│   │   │   └── witnessBuilder.ts        # assembles private+public inputs for the circuit
+│   │   └── merkle/
+│   │       └── merklePath.ts            # helpers for interpreting path/indices from API
+│   │
+│   ├── store/                           # Zustand
+│   │   ├── useAuthStore.ts              # wallet address, JWT
+│   │   ├── useAttestationStore.ts       # secret_salt, merkle path — client-only, never logged
+│   │   ├── useProofStore.ts             # in-progress proof/payment flow state
+│   │   └── usePaymentStore.ts
+│   │
+│   ├── types/
+│   │   ├── api.types.ts
+│   │   ├── zk.types.ts
+│   │   └── stellar.types.ts
+│   │
+│   ├── utils/
+│   │   ├── constants.ts                 # network config, contract IDs, explorer base URL
+│   │   ├── formatters.ts                 # amount/asset display, truncated addresses
+│   │   └── validators.ts                 # zod schemas mirroring backend validation
+│   │
+│   ├── styles/
+│   │   └── globals.css                  # Tailwind directives
+│   │
+│   ├── router.tsx                       # routes for the 4 pages
+│   ├── App.tsx
+│   └── main.tsx
+│
+├── .env.example                          # VITE_API_URL, VITE_STELLAR_NETWORK, contract IDs
+├── index.html
+├── tailwind.config.ts
+├── postcss.config.js
+├── vite.config.ts
+├── tsconfig.json
+└── package.json
