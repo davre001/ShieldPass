@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // Using SQLite for easy hackathon setup
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String   @id @default(uuid())
+  walletAddress String   @unique
+  createdAt     DateTime @default(now())
+  attestation   ComplianceAttestation?
+}
+
+model ComplianceAttestation {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  leafIndex       Int
+  leafCommitment  String
+  isHuman         Boolean  @default(true)
+  bvnVerified     Boolean  @default(true)
+  goodStanding    Boolean  @default(true)
+  createdAt       DateTime @default(now())
+}
+
+model P2POffer {
+  id              String   @id @default(uuid())
+  sellerWallet    String
+  assetType       String   // USDC, XLM, NGNC
+  cryptoAmount    String
+  nairaRate       String
+  bankDetails     String   // e.g. "GTBank 0123456789"
+  status          String   @default("open") // open | locked | completed | canceled
+  createdAt       DateTime @default(now())
+}
+
+model RelayerTransaction {
+  id              String   @id @default(uuid())
+  walletAddress   String
+  action          String
+  txHash          String   @unique
+  status          String   // pending | success | failed
+  createdAt       DateTime @default(now())
+}

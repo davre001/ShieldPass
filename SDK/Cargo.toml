@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = [
+    "contracts/*"
+]
+
+[profile.release]
+overflow-checks = true
+opt-level = "z"
+
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true
