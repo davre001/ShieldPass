@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { WalletConnectButton } from "../components/wallet/WalletConnectButton";
+import { WalletConnectButton } from "../components/WalletConnectButton";
 import { useAuthStore } from "../store/useAuthStore";
 
 export default function LandingPage() {

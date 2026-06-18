@@ -1,536 +1,120 @@
 Folder PATH listing
 Volume serial number is C43B-0C16
 C:.
-ÀÄÄÄshieldpass-frontend
-    ÃÄÄÄnode_modules
-    ³   ÃÄÄÄ.bin
-    ³   ÃÄÄÄ.vite
-    ³   ³   ÀÄÄÄdeps
-    ³   ÃÄÄÄ.vite-temp
-    ³   ÃÄÄÄ@babel
-    ³   ³   ÃÄÄÄcode-frame
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ÃÄÄÄcompat-data
-    ³   ³   ³   ÀÄÄÄdata
-    ³   ³   ÃÄÄÄcore
-    ³   ³   ³   ÃÄÄÄlib
-    ³   ³   ³   ³   ÃÄÄÄconfig
-    ³   ³   ³   ³   ³   ÃÄÄÄfiles
-    ³   ³   ³   ³   ³   ÃÄÄÄhelpers
-    ³   ³   ³   ³   ³   ÀÄÄÄvalidation
-    ³   ³   ³   ³   ÃÄÄÄerrors
-    ³   ³   ³   ³   ÃÄÄÄgensync-utils
-    ³   ³   ³   ³   ÃÄÄÄparser
-    ³   ³   ³   ³   ³   ÀÄÄÄutil
-    ³   ³   ³   ³   ÃÄÄÄtools
-    ³   ³   ³   ³   ÃÄÄÄtransformation
-    ³   ³   ³   ³   ³   ÃÄÄÄfile
-    ³   ³   ³   ³   ³   ÀÄÄÄutil
-    ³   ³   ³   ³   ÀÄÄÄvendor
-    ³   ³   ³   ÀÄÄÄsrc
-    ³   ³   ³       ÃÄÄÄconfig
-    ³   ³   ³       ³   ÀÄÄÄfiles
-    ³   ³   ³       ÀÄÄÄtransformation
-    ³   ³   ÃÄÄÄgenerator
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ³       ÃÄÄÄgenerators
-    ³   ³   ³       ÀÄÄÄnode
-    ³   ³   ÃÄÄÄhelper-compilation-targets
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ÃÄÄÄhelper-globals
-    ³   ³   ³   ÀÄÄÄdata
-    ³   ³   ÃÄÄÄhelper-module-imports
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ÃÄÄÄhelper-module-transforms
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ÃÄÄÄhelper-string-parser
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ÃÄÄÄhelper-validator-identifier
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ÃÄÄÄhelper-validator-option
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ÃÄÄÄhelpers
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ³       ÀÄÄÄhelpers
-    ³   ³   ÃÄÄÄparser
-    ³   ³   ³   ÃÄÄÄbin
-    ³   ³   ³   ÃÄÄÄlib
-    ³   ³   ³   ÀÄÄÄtypings
-    ³   ³   ÃÄÄÄtemplate
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ÃÄÄÄtraverse
-    ³   ³   ³   ÀÄÄÄlib
-    ³   ³   ³       ÃÄÄÄpath
-    ³   ³   ³       ³   ÃÄÄÄinference
-    ³   ³   ³       ³   ÀÄÄÄlib
-    ³   ³   ³       ÀÄÄÄscope
-    ³   ³   ³           ÀÄÄÄlib
-    ³   ³   ÀÄÄÄtypes
-    ³   ³       ÀÄÄÄlib
-    ³   ³           ÃÄÄÄasserts
-    ³   ³           ³   ÀÄÄÄgenerated
-    ³   ³           ÃÄÄÄast-types
-    ³   ³           ³   ÀÄÄÄgenerated
-    ³   ³           ÃÄÄÄbuilders
-    ³   ³           ³   ÃÄÄÄflow
-    ³   ³           ³   ÃÄÄÄgenerated
-    ³   ³           ³   ÃÄÄÄreact
-    ³   ³           ³   ÀÄÄÄtypescript
-    ³   ³           ÃÄÄÄclone
-    ³   ³           ÃÄÄÄcomments
-    ³   ³           ÃÄÄÄconstants
-    ³   ³           ³   ÀÄÄÄgenerated
-    ³   ³           ÃÄÄÄconverters
-    ³   ³           ÃÄÄÄdefinitions
-    ³   ³           ÃÄÄÄmodifications
-    ³   ³           ³   ÃÄÄÄflow
-    ³   ³           ³   ÀÄÄÄtypescript
-    ³   ³           ÃÄÄÄretrievers
-    ³   ³           ÃÄÄÄtraverse
-    ³   ³           ÃÄÄÄutils
-    ³   ³           ³   ÀÄÄÄreact
-    ³   ³           ÀÄÄÄvalidators
-    ³   ³               ÃÄÄÄgenerated
-    ³   ³               ÀÄÄÄreact
-    ³   ÃÄÄÄ@eslint
-    ³   ³   ÃÄÄÄconfig-array
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ³       ÃÄÄÄcjs
-    ³   ³   ³       ³   ÀÄÄÄstd__path
-    ³   ³   ³       ÀÄÄÄesm
-    ³   ³   ³           ÀÄÄÄstd__path
-    ³   ³   ÃÄÄÄconfig-helpers
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ³       ÃÄÄÄcjs
-    ³   ³   ³       ÀÄÄÄesm
-    ³   ³   ÃÄÄÄcore
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ³       ÃÄÄÄcjs
-    ³   ³   ³       ÀÄÄÄesm
-    ³   ³   ÃÄÄÄjs
-    ³   ³   ³   ÃÄÄÄsrc
-    ³   ³   ³   ³   ÀÄÄÄconfigs
-    ³   ³   ³   ÀÄÄÄtypes
-    ³   ³   ÃÄÄÄobject-schema
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ³       ÃÄÄÄcjs
-    ³   ³   ³       ÀÄÄÄesm
-    ³   ³   ÀÄÄÄplugin-kit
-    ³   ³       ÀÄÄÄdist
-    ³   ³           ÃÄÄÄcjs
-    ³   ³           ÀÄÄÄesm
-    ³   ÃÄÄÄ@eslint-community
-    ³   ³   ÃÄÄÄeslint-utils
-    ³   ³   ³   ÀÄÄÄnode_modules
-    ³   ³   ³       ÀÄÄÄeslint-visitor-keys
-    ³   ³   ³           ÃÄÄÄdist
-    ³   ³   ³           ÀÄÄÄlib
-    ³   ³   ÀÄÄÄregexpp
-    ³   ÃÄÄÄ@humanfs
-    ³   ³   ÃÄÄÄcore
-    ³   ³   ³   ÃÄÄÄdist
-    ³   ³   ³   ÀÄÄÄsrc
-    ³   ³   ÃÄÄÄnode
-    ³   ³   ³   ÃÄÄÄdist
-    ³   ³   ³   ÀÄÄÄsrc
-    ³   ³   ÀÄÄÄtypes
-    ³   ³       ÀÄÄÄsrc
-    ³   ÃÄÄÄ@humanwhocodes
-    ³   ³   ÃÄÄÄmodule-importer
-    ³   ³   ³   ÃÄÄÄdist
-    ³   ³   ³   ÀÄÄÄsrc
-    ³   ³   ÀÄÄÄretry
-    ³   ³       ÀÄÄÄdist
-    ³   ÃÄÄÄ@jridgewell
-    ³   ³   ÃÄÄÄgen-mapping
-    ³   ³   ³   ÃÄÄÄdist
-    ³   ³   ³   ³   ÀÄÄÄtypes
-    ³   ³   ³   ÃÄÄÄsrc
-    ³   ³   ³   ÀÄÄÄtypes
-    ³   ³   ÃÄÄÄremapping
-    ³   ³   ³   ÃÄÄÄdist
-    ³   ³   ³   ÃÄÄÄsrc
-    ³   ³   ³   ÀÄÄÄtypes
-    ³   ³   ÃÄÄÄresolve-uri
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ³       ÀÄÄÄtypes
-    ³   ³   ÃÄÄÄsourcemap-codec
-    ³   ³   ³   ÃÄÄÄdist
-    ³   ³   ³   ÃÄÄÄsrc
-    ³   ³   ³   ÀÄÄÄtypes
-    ³   ³   ÀÄÄÄtrace-mapping
-    ³   ³       ÃÄÄÄdist
-    ³   ³       ÃÄÄÄsrc
-    ³   ³       ÀÄÄÄtypes
-    ³   ÃÄÄÄ@oxc-project
-    ³   ³   ÀÄÄÄtypes
-    ³   ÃÄÄÄ@rolldown
-    ³   ³   ÃÄÄÄbinding-win32-x64-msvc
-    ³   ³   ÀÄÄÄpluginutils
-    ³   ³       ÀÄÄÄdist
-    ³   ³           ÀÄÄÄfilter
-    ³   ÃÄÄÄ@types
-    ³   ³   ÃÄÄÄesrecurse
-    ³   ³   ÃÄÄÄestree
-    ³   ³   ÃÄÄÄjson-schema
-    ³   ³   ÃÄÄÄnode
-    ³   ³   ³   ÃÄÄÄassert
-    ³   ³   ³   ÃÄÄÄcompatibility
-    ³   ³   ³   ÃÄÄÄdns
-    ³   ³   ³   ÃÄÄÄfs
-    ³   ³   ³   ÃÄÄÄreadline
-    ³   ³   ³   ÃÄÄÄstream
-    ³   ³   ³   ÃÄÄÄtimers
-    ³   ³   ³   ÃÄÄÄts5.6
-    ³   ³   ³   ³   ÀÄÄÄcompatibility
-    ³   ³   ³   ÃÄÄÄts5.7
-    ³   ³   ³   ³   ÀÄÄÄcompatibility
-    ³   ³   ³   ÀÄÄÄweb-globals
-    ³   ³   ÃÄÄÄreact
-    ³   ³   ³   ÀÄÄÄts5.0
-    ³   ³   ÀÄÄÄreact-dom
-    ³   ³       ÀÄÄÄtest-utils
-    ³   ÃÄÄÄ@typescript-eslint
-    ³   ³   ÃÄÄÄeslint-plugin
-    ³   ³   ³   ÃÄÄÄdist
-    ³   ³   ³   ³   ÃÄÄÄconfigs
-    ³   ³   ³   ³   ³   ÃÄÄÄeslintrc
-    ³   ³   ³   ³   ³   ÀÄÄÄflat
-    ³   ³   ³   ³   ÃÄÄÄrules
-    ³   ³   ³   ³   ³   ÃÄÄÄenum-utils
-    ³   ³   ³   ³   ³   ÃÄÄÄnaming-convention-utils
-    ³   ³   ³   ³   ³   ÀÄÄÄprefer-optional-chain-utils
-    ³   ³   ³   ³   ÀÄÄÄutil
-    ³   ³   ³   ³       ÀÄÄÄclass-scope-analyzer
-    ³   ³   ³   ÀÄÄÄnode_modules
-    ³   ³   ³       ÀÄÄÄignore
-    ³   ³   ÃÄÄÄparser
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ÃÄÄÄproject-service
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ÃÄÄÄscope-manager
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ³       ÃÄÄÄdefinition
-    ³   ³   ³       ÃÄÄÄlib
-    ³   ³   ³       ÃÄÄÄreferencer
-    ³   ³   ³       ÃÄÄÄscope
-    ³   ³   ³       ÀÄÄÄvariable
-    ³   ³   ÃÄÄÄtsconfig-utils
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ÃÄÄÄtype-utils
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ³       ÀÄÄÄtypeOrValueSpecifiers
-    ³   ³   ÃÄÄÄtypes
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ³       ÀÄÄÄgenerated
-    ³   ³   ÃÄÄÄtypescript-estree
-    ³   ³   ³   ÃÄÄÄdist
-    ³   ³   ³   ³   ÃÄÄÄcreate-program
-    ³   ³   ³   ³   ÃÄÄÄjsx
-    ³   ³   ³   ³   ÃÄÄÄparseSettings
-    ³   ³   ³   ³   ÀÄÄÄts-estree
-    ³   ³   ³   ÀÄÄÄnode_modules
-    ³   ³   ³       ÃÄÄÄ.bin
-    ³   ³   ³       ÀÄÄÄsemver
-    ³   ³   ³           ÃÄÄÄbin
-    ³   ³   ³           ÃÄÄÄclasses
-    ³   ³   ³           ÃÄÄÄfunctions
-    ³   ³   ³           ÃÄÄÄinternal
-    ³   ³   ³           ÀÄÄÄranges
-    ³   ³   ÃÄÄÄutils
-    ³   ³   ³   ÀÄÄÄdist
-    ³   ³   ³       ÃÄÄÄast-utils
-    ³   ³   ³       ³   ÀÄÄÄeslint-utils
-    ³   ³   ³       ÃÄÄÄeslint-utils
-    ³   ³   ³       ÃÄÄÄts-eslint
-    ³   ³   ³       ³   ÀÄÄÄeslint
-    ³   ³   ³       ÀÄÄÄts-utils
-    ³   ³   ÀÄÄÄvisitor-keys
-    ³   ³       ÀÄÄÄdist
-    ³   ÃÄÄÄ@vitejs
-    ³   ³   ÀÄÄÄplugin-react
-    ³   ³       ÃÄÄÄdist
-    ³   ³       ÀÄÄÄtypes
-    ³   ÃÄÄÄacorn
-    ³   ³   ÃÄÄÄbin
-    ³   ³   ÀÄÄÄdist
-    ³   ÃÄÄÄacorn-jsx
-    ³   ÃÄÄÄajv
-    ³   ³   ÃÄÄÄdist
-    ³   ³   ÃÄÄÄlib
-    ³   ³   ³   ÃÄÄÄcompile
-    ³   ³   ³   ÃÄÄÄdot
-    ³   ³   ³   ÃÄÄÄdotjs
-    ³   ³   ³   ÀÄÄÄrefs
-    ³   ³   ÀÄÄÄscripts
-    ³   ÃÄÄÄbalanced-match
-    ³   ³   ÀÄÄÄdist
-    ³   ³       ÃÄÄÄcommonjs
-    ³   ³       ÀÄÄÄesm
-    ³   ÃÄÄÄbaseline-browser-mapping
-    ³   ³   ÀÄÄÄdist
-    ³   ÃÄÄÄbrace-expansion
-    ³   ³   ÀÄÄÄdist
-    ³   ³       ÃÄÄÄcommonjs
-    ³   ³       ÀÄÄÄesm
-    ³   ÃÄÄÄbrowserslist
-    ³   ÃÄÄÄcaniuse-lite
-    ³   ³   ÃÄÄÄdata
-    ³   ³   ³   ÃÄÄÄfeatures
-    ³   ³   ³   ÀÄÄÄregions
-    ³   ³   ÀÄÄÄdist
-    ³   ³       ÃÄÄÄlib
-    ³   ³       ÀÄÄÄunpacker
-    ³   ÃÄÄÄconvert-source-map
-    ³   ÃÄÄÄcross-spawn
-    ³   ³   ÀÄÄÄlib
-    ³   ³       ÀÄÄÄutil
-    ³   ÃÄÄÄcsstype
-    ³   ÃÄÄÄdebug
-    ³   ³   ÀÄÄÄsrc
-    ³   ÃÄÄÄdeep-is
-    ³   ³   ÃÄÄÄexample
-    ³   ³   ÀÄÄÄtest
-    ³   ÃÄÄÄdetect-libc
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄelectron-to-chromium
-    ³   ÃÄÄÄescalade
-    ³   ³   ÃÄÄÄdist
-    ³   ³   ÀÄÄÄsync
-    ³   ÃÄÄÄescape-string-regexp
-    ³   ÃÄÄÄeslint
-    ³   ³   ÃÄÄÄbin
-    ³   ³   ÃÄÄÄconf
-    ³   ³   ÃÄÄÄlib
-    ³   ³   ³   ÃÄÄÄcli-engine
-    ³   ³   ³   ³   ÀÄÄÄformatters
-    ³   ³   ³   ÃÄÄÄconfig
-    ³   ³   ³   ÃÄÄÄeslint
-    ³   ³   ³   ÃÄÄÄlanguages
-    ³   ³   ³   ³   ÀÄÄÄjs
-    ³   ³   ³   ³       ÀÄÄÄsource-code
-    ³   ³   ³   ³           ÀÄÄÄtoken-store
-    ³   ³   ³   ÃÄÄÄlinter
-    ³   ³   ³   ³   ÀÄÄÄcode-path-analysis
-    ³   ³   ³   ÃÄÄÄrule-tester
-    ³   ³   ³   ÃÄÄÄrules
-    ³   ³   ³   ³   ÀÄÄÄutils
-    ³   ³   ³   ³       ÀÄÄÄunicode
-    ³   ³   ³   ÃÄÄÄservices
-    ³   ³   ³   ÃÄÄÄshared
-    ³   ³   ³   ÀÄÄÄtypes
-    ³   ³   ÀÄÄÄmessages
-    ³   ÃÄÄÄeslint-plugin-react-hooks
-    ³   ³   ÀÄÄÄcjs
-    ³   ÃÄÄÄeslint-plugin-react-refresh
-    ³   ÃÄÄÄeslint-scope
-    ³   ³   ÃÄÄÄdist
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄeslint-visitor-keys
-    ³   ³   ÃÄÄÄdist
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄespree
-    ³   ³   ÃÄÄÄdist
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄesquery
-    ³   ³   ÀÄÄÄdist
-    ³   ÃÄÄÄesrecurse
-    ³   ÃÄÄÄestraverse
-    ³   ÃÄÄÄesutils
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄfast-deep-equal
-    ³   ³   ÀÄÄÄes6
-    ³   ÃÄÄÄfast-json-stable-stringify
-    ³   ³   ÃÄÄÄ.github
-    ³   ³   ÃÄÄÄbenchmark
-    ³   ³   ÃÄÄÄexample
-    ³   ³   ÀÄÄÄtest
-    ³   ÃÄÄÄfast-levenshtein
-    ³   ÃÄÄÄfdir
-    ³   ³   ÀÄÄÄdist
-    ³   ÃÄÄÄfile-entry-cache
-    ³   ÃÄÄÄfind-up
-    ³   ÃÄÄÄflat-cache
-    ³   ³   ÀÄÄÄsrc
-    ³   ÃÄÄÄflatted
-    ³   ³   ÃÄÄÄcjs
-    ³   ³   ÃÄÄÄesm
-    ³   ³   ÃÄÄÄgolang
-    ³   ³   ³   ÀÄÄÄpkg
-    ³   ³   ³       ÀÄÄÄflatted
-    ³   ³   ÃÄÄÄphp
-    ³   ³   ÃÄÄÄpython
-    ³   ³   ÀÄÄÄtypes
-    ³   ÃÄÄÄgensync
-    ³   ³   ÀÄÄÄtest
-    ³   ÃÄÄÄglob-parent
-    ³   ÃÄÄÄglobals
-    ³   ÃÄÄÄhermes-estree
-    ³   ³   ÀÄÄÄdist
-    ³   ³       ÀÄÄÄgenerated
-    ³   ÃÄÄÄhermes-parser
-    ³   ³   ÀÄÄÄdist
-    ³   ³       ÃÄÄÄbabel
-    ³   ³       ÃÄÄÄestree
-    ³   ³       ÃÄÄÄgenerated
-    ³   ³       ÃÄÄÄtransform
-    ³   ³       ÃÄÄÄtraverse
-    ³   ³       ÀÄÄÄutils
-    ³   ÃÄÄÄignore
-    ³   ÃÄÄÄimurmurhash
-    ³   ÃÄÄÄis-extglob
-    ³   ÃÄÄÄis-glob
-    ³   ÃÄÄÄisexe
-    ³   ³   ÀÄÄÄtest
-    ³   ÃÄÄÄjs-tokens
-    ³   ÃÄÄÄjsesc
-    ³   ³   ÃÄÄÄbin
-    ³   ³   ÀÄÄÄman
-    ³   ÃÄÄÄjson-buffer
-    ³   ³   ÀÄÄÄtest
-    ³   ÃÄÄÄjson-schema-traverse
-    ³   ³   ÀÄÄÄspec
-    ³   ³       ÀÄÄÄfixtures
-    ³   ÃÄÄÄjson-stable-stringify-without-jsonify
-    ³   ³   ÃÄÄÄexample
-    ³   ³   ÀÄÄÄtest
-    ³   ÃÄÄÄjson5
-    ³   ³   ÃÄÄÄdist
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄkeyv
-    ³   ³   ÀÄÄÄsrc
-    ³   ÃÄÄÄlevn
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄlightningcss
-    ³   ³   ÀÄÄÄnode
-    ³   ÃÄÄÄlightningcss-win32-x64-msvc
-    ³   ÃÄÄÄlocate-path
-    ³   ÃÄÄÄlru-cache
-    ³   ÃÄÄÄminimatch
-    ³   ³   ÀÄÄÄdist
-    ³   ³       ÃÄÄÄcommonjs
-    ³   ³       ÀÄÄÄesm
-    ³   ÃÄÄÄms
-    ³   ÃÄÄÄnanoid
-    ³   ³   ÃÄÄÄ.claude
-    ³   ³   ÃÄÄÄasync
-    ³   ³   ÃÄÄÄbin
-    ³   ³   ÃÄÄÄnon-secure
-    ³   ³   ÀÄÄÄurl-alphabet
-    ³   ÃÄÄÄnatural-compare
-    ³   ÃÄÄÄnode-releases
-    ³   ³   ÀÄÄÄdata
-    ³   ³       ÃÄÄÄprocessed
-    ³   ³       ÀÄÄÄrelease-schedule
-    ³   ÃÄÄÄoptionator
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄp-limit
-    ³   ÃÄÄÄp-locate
-    ³   ÃÄÄÄpath-exists
-    ³   ÃÄÄÄpath-key
-    ³   ÃÄÄÄpicocolors
-    ³   ÃÄÄÄpicomatch
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄpostcss
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄprelude-ls
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄpunycode
-    ³   ÃÄÄÄreact
-    ³   ³   ÀÄÄÄcjs
-    ³   ÃÄÄÄreact-dom
-    ³   ³   ÀÄÄÄcjs
-    ³   ÃÄÄÄrolldown
-    ³   ³   ÃÄÄÄbin
-    ³   ³   ÀÄÄÄdist
-    ³   ³       ÀÄÄÄshared
-    ³   ÃÄÄÄscheduler
-    ³   ³   ÀÄÄÄcjs
-    ³   ÃÄÄÄsemver
-    ³   ³   ÀÄÄÄbin
-    ³   ÃÄÄÄshebang-command
-    ³   ÃÄÄÄshebang-regex
-    ³   ÃÄÄÄsource-map-js
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄtinyglobby
-    ³   ³   ÀÄÄÄdist
-    ³   ÃÄÄÄts-api-utils
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄtype-check
-    ³   ³   ÀÄÄÄlib
-    ³   ÃÄÄÄtypescript
-    ³   ³   ÃÄÄÄbin
-    ³   ³   ÀÄÄÄlib
-    ³   ³       ÃÄÄÄcs
-    ³   ³       ÃÄÄÄde
-    ³   ³       ÃÄÄÄes
-    ³   ³       ÃÄÄÄfr
-    ³   ³       ÃÄÄÄit
-    ³   ³       ÃÄÄÄja
-    ³   ³       ÃÄÄÄko
-    ³   ³       ÃÄÄÄpl
-    ³   ³       ÃÄÄÄpt-br
-    ³   ³       ÃÄÄÄru
-    ³   ³       ÃÄÄÄtr
-    ³   ³       ÃÄÄÄzh-cn
-    ³   ³       ÀÄÄÄzh-tw
-    ³   ÃÄÄÄtypescript-eslint
-    ³   ³   ÀÄÄÄdist
-    ³   ÃÄÄÄundici-types
-    ³   ÃÄÄÄupdate-browserslist-db
-    ³   ÃÄÄÄuri-js
-    ³   ³   ÀÄÄÄdist
-    ³   ³       ÃÄÄÄes5
-    ³   ³       ÀÄÄÄesnext
-    ³   ³           ÀÄÄÄschemes
-    ³   ÃÄÄÄvite
-    ³   ³   ÃÄÄÄbin
-    ³   ³   ÃÄÄÄdist
-    ³   ³   ³   ÃÄÄÄclient
-    ³   ³   ³   ÀÄÄÄnode
-    ³   ³   ³       ÀÄÄÄchunks
-    ³   ³   ÃÄÄÄmisc
-    ³   ³   ÀÄÄÄtypes
-    ³   ³       ÀÄÄÄinternal
-    ³   ÃÄÄÄwhich
-    ³   ³   ÀÄÄÄbin
-    ³   ÃÄÄÄword-wrap
-    ³   ÃÄÄÄyallist
-    ³   ÃÄÄÄyocto-queue
-    ³   ÃÄÄÄzod
-    ³   ³   ÃÄÄÄlocales
-    ³   ³   ÃÄÄÄmini
-    ³   ³   ÃÄÄÄsrc
-    ³   ³   ³   ÃÄÄÄlocales
-    ³   ³   ³   ÃÄÄÄmini
-    ³   ³   ³   ÃÄÄÄv3
-    ³   ³   ³   ³   ÃÄÄÄbenchmarks
-    ³   ³   ³   ³   ÃÄÄÄhelpers
-    ³   ³   ³   ³   ÃÄÄÄlocales
-    ³   ³   ³   ³   ÀÄÄÄtests
-    ³   ³   ³   ÃÄÄÄv4
-    ³   ³   ³   ³   ÃÄÄÄclassic
-    ³   ³   ³   ³   ³   ÀÄÄÄtests
-    ³   ³   ³   ³   ÃÄÄÄcore
-    ³   ³   ³   ³   ³   ÀÄÄÄtests
-    ³   ³   ³   ³   ³       ÀÄÄÄlocales
-    ³   ³   ³   ³   ÃÄÄÄlocales
-    ³   ³   ³   ³   ÀÄÄÄmini
-    ³   ³   ³   ³       ÀÄÄÄtests
-    ³   ³   ³   ÀÄÄÄv4-mini
-    ³   ³   ÃÄÄÄv3
-    ³   ³   ³   ÃÄÄÄhelpers
-    ³   ³   ³   ÀÄÄÄlocales
-    ³   ³   ÃÄÄÄv4
-    ³   ³   ³   ÃÄÄÄclassic
-    ³   ³   ³   ÃÄÄÄcore
-    ³   ³   ³   ÃÄÄÄlocales
-    ³   ³   ³   ÀÄÄÄmini
-    ³   ³   ÀÄÄÄv4-mini
-    ³   ÀÄÄÄzod-validation-error
-    ³       ÃÄÄÄv3
-    ³       ÀÄÄÄv4
-    ÃÄÄÄpublic
-    ÀÄÄÄsrc
-        ÃÄÄÄassets
-        ÀÄÄÄpages
+|   filetree.txt
+|   Implementation.md
+|   LICENSE
+|   README.md
+|   shieldpass-frontend.stash.sh
+|   stash
+|   
++---frontend
+|   |   .env.example
+|   |   .env.local
+|   |   .gitignore
+|   |   eslint.config.js
+|   |   index.html
+|   |   package-lock.json
+|   |   package.json
+|   |   README.md
+|   |   tailwind.config.js
+|   |   touch
+|   |   tsconfig.app.json
+|   |   tsconfig.json
+|   |   tsconfig.node.json
+|   |   vite.config.ts
+|   |   
+|   +---dist
+|   |   |   favicon.svg
+|   |   |   icons.svg
+|   |   |   index.html
+|   |   |   
+|   |   +---assets
+|   |   |       barretenberg-2hCt9EAV.js
+|   |   |       barretenberg-2hCt9EAV.js.map
+|   |   |       barretenberg-threads-KLP3P3q0.js
+|   |   |       barretenberg-threads-KLP3P3q0.js.map
+|   |   |       index-CC6adSig.css
+|   |   |       index-lLdIG9r6.js
+|   |   |       index-lLdIG9r6.js.map
+|   |   |       main.worker-jispeSmn.js
+|   |   |       main.worker-jispeSmn.js.map
+|   |   |       proof.worker-DEY2K2LC.js
+|   |   |       proof.worker-DEY2K2LC.js.map
+|   |   |       thread.worker-D0SMZGup.js
+|   |   |       thread.worker-D0SMZGup.js.map
+|   |   |       
+|   |   \---circuits
+|   |   
+|   \---src
+|       |   App.tsx
+|       |   main.tsx
+|       |   index.css
+|       |   
+|       +---pages
+|       |       LandingPage.tsx
+|       |       OnboardingPage.tsx        // mock BVN entry screen
+|       |       MarketplacePage.tsx       // P2P order book
+|       |       TradeRoomPage.tsx         // escrow screen + Release Crypto button
+|       |       DashboardPage.tsx         // balances + trade history
+|       |       
+|       +---components
+|       |       WalletConnectButton.tsx   // Freighter / Stellar Wallets Kit
+|       |       ProofGenerationModal.tsx  // bb.js in-browser prover UI
+|       |       OfferCard.tsx
+|       |       
+|       +---lib
+|       |       proof.ts                 // bb.js prover wrapper, builds Noir witness
+|       |       stellar.ts               // Horizon / Soroban RPC client helpers
+|       |       api.ts                   // REST client for backend
+|       |       
+|       \---circuits
+|               kyc_proof.json           // compiled Noir circuit artifact (bundled for bb.js)
+|               
++---backend
+|   |   .env.example
+|   |   package.json
+|   |   tsconfig.json
+|   |   
+|   +---prisma
+|   |       schema.prisma                // includes P2POffer model
+|   |       
+|   \---src
+|       |   index.ts                     // Express/Fastify entrypoint
+|       |   
+|       +---routes
+|       |       kyc.ts                   // POST /kyc/submit-bvn
+|       |       compliance.ts            // POST /compliance/issue-attestation, GET /compliance/root
+|       |       verify.ts                // POST /verify/submit-proof (relayer endpoint)
+|       |       p2p.ts                   // POST /p2p/offers, POST /p2p/offers/:id/accept
+|       |       
+|       +---services
+|       |       issuerService.ts         // mock BVN -> flags -> Merkle leaf + secret_salt
+|       |       merkleTree.ts            // off-chain Merkle tree (Poseidon hash)
+|       |       relayerService.ts        // verifies client proof, submits record_verified_nullifier()
+|       |       stellarClient.ts         // Horizon/RPC wrapper for contract calls
+|       |       
+|       \---db
+|               prismaClient.ts
+|               
++---circuits
+|   \---kyc_proof
+|       |   Nargo.toml
+|       |   
+|       \---src
+|               main.nr                  // Noir circuit: membership + flags + nullifier
+|               
+\---contracts
+    |   Cargo.toml                       // Soroban workspace
+    |   
+    +---compliance_registry
+    |   |   Cargo.toml
+    |   |   
+    |   \---src
+    |           lib.rs                  // publish_root(), record_verified_nullifier(), is_verified()
+    |           
+    \---p2p_escrow
+        |   Cargo.toml
+        |   
+        \---src
+                lib.rs                  // create_offer(), release_crypto()

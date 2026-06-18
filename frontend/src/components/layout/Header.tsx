@@ -1,6 +1,6 @@
 import { Link, NavLink } from "react-router-dom";
-import { WalletConnectButton } from "../wallet/WalletConnectButton";
-import { useAuthStore } from "../../store/useAuthStore";
+import { WalletConnectButton } from "../WalletConnectButton";
+import { useAuthStore } from "../../stores/authStore";
 
 export function Header() {
   const { walletAddress } = useAuthStore();
