@@ -59,7 +59,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--ink)] text-[var(--paper)] flex items-center justify-center px-6">
+    <div className="min-h-screen text-[var(--paper)] flex items-center justify-center px-6">
       <div className="w-full max-w-md">
         <p className="font-mono text-xs uppercase tracking-widest text-[var(--rust)] mb-3">
           Step 1 of 1

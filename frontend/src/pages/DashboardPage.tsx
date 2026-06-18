@@ -48,7 +48,7 @@ export default function DashboardPage() {
   }, [walletAddress]);
 
   return (
-    <div className="min-h-screen bg-[var(--ink)] text-[var(--paper)] px-6 md:px-12 py-12">
+    <div className="min-h-screen text-[var(--paper)] px-6 md:px-12 py-12">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-baseline justify-between mb-8">
           <h1 className="font-display text-3xl">Dashboard</h1>
@@ -88,14 +88,17 @@ export default function DashboardPage() {
               {!balancesLoading && !balancesError && (
                 <div className="grid sm:grid-cols-2 gap-px bg-[var(--hairline)] border border-[var(--hairline)]">
                   {balances.length === 0 ? (
-                    <div className="bg-[var(--ink)] p-6">
+                    <div className="bg-black/30 backdrop-blur-sm p-6">
                       <p className="text-[var(--stone)] text-sm">
                         No balances on this account yet.
                       </p>
                     </div>
                   ) : (
                     balances.map((b) => (
-                      <div key={b.assetCode} className="bg-[var(--ink)] p-6">
+                      <div
+                        key={b.assetCode}
+                        className="bg-black/30 backdrop-blur-sm p-6"
+                      >
                         <p className="font-mono text-xs text-[var(--stone)] mb-2">
                           {b.assetCode}
                         </p>

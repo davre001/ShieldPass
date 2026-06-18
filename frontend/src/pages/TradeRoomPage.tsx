@@ -39,7 +39,7 @@ export default function TradeRoomPage() {
 
   if (!state) {
     return (
-      <div className="min-h-screen bg-[var(--ink)] text-[var(--paper)] flex items-center justify-center px-6">
+      <div className="min-h-screen text-[var(--paper)] flex items-center justify-center px-6">
         <div className="max-w-md text-center">
           <p className="font-mono text-xs uppercase tracking-widest text-[var(--rust)] mb-3">
             Trade #{id}
@@ -100,7 +100,7 @@ export default function TradeRoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--ink)] text-[var(--paper)] px-6 md:px-12 py-12">
+    <div className="min-h-screen text-[var(--paper)] px-6 md:px-12 py-12">
       <div className="max-w-2xl mx-auto">
         <Link
           to="/marketplace"

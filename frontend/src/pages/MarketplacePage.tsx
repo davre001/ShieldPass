@@ -75,7 +75,7 @@ export default function MarketplacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--ink)] text-[var(--paper)] px-6 md:px-12 py-12">
+    <div className="min-h-screen text-[var(--paper)] px-6 md:px-12 py-12">
       <div className="flex items-baseline justify-between mb-8">
         <h1 className="font-display text-3xl">Marketplace</h1>
         <p className="font-mono text-xs text-[var(--stone)]">
@@ -103,7 +103,7 @@ export default function MarketplacePage() {
           return (
             <div
               key={offer.id}
-              className="flex items-center justify-between px-6 py-5 hover:bg-[var(--paper)]/[0.02] transition-colors"
+              className="flex items-center justify-between px-6 py-5 hover:bg-white/[0.03] transition-colors"
             >
               <div className="flex items-baseline gap-6">
                 <span className="font-mono text-lg">
