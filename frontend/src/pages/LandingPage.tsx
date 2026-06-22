@@ -1,5 +1,5 @@
 import ScrollHero from "../components/ui/ethereal";
-import WalletConnectButton from "../components/WalletConnectButton";
+
 import LoginButton from "../components/LoginButton";
 import { Icons } from "../components/ui/icons";
 import { motion, useInView } from "motion/react";
@@ -191,14 +191,13 @@ export default function LandingPage() {
         {
           id: "hero",
           headline: "ShieldPass",
-          subheadline: <RevealText text="Zero-Knowledge P2P" />,
+          subheadline: <RevealText text="Zero-Knowledge Swaps" />,
           body: <TypewriterText text="Trade crypto for naira with zero identity exposure — powered by ZK proofs on Stellar." />,
           action: (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-3">
                 <Link to="/onboarding" className={btnPrimary}>Get Started</Link>
                 <LoginButton className={btnGhost} />
-                <WalletConnectButton />
               </div>
               <div className="flex flex-wrap gap-2">
                 <Pill>Stellar Testnet</Pill>
@@ -283,13 +282,23 @@ export default function LandingPage() {
           id: "assets",
           headline: "Assets",
           subheadline: <RevealText text="Crypto ⇄ Naira" />,
-          body: "Trade between Stellar-native assets and Nigerian naira. Fiat moves through Paystack while crypto settles on-chain.",
+          body: "Trade between Stellar-native assets and Nigerian naira. Fiat moves through Lenco Business Banking while crypto settles on-chain.",
           media: (
             <Panel label="Supported assets">
+<<<<<<< HEAD
               <Asset sym="XLM" name="Stellar Lumens" index={0} />
               <Asset sym="USDC" name="USD Coin" index={1} />
               <Asset sym="NGNC" name="Naira stablecoin" index={2} />
               <Asset sym="₦ NGN" name="via Paystack" index={3} className="mt-1 border-indigo-500/20 bg-indigo-500/[0.06]" />
+=======
+              <Asset sym="XLM" name="Stellar Lumens" />
+              <Asset sym="USDC" name="USD Coin" />
+              <Asset sym="NGNC" name="Naira stablecoin" />
+              <div className="mt-1 flex items-center justify-between rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] px-4 py-3">
+                <span className="font-mono text-white text-sm">₦ NGN</span>
+                <span className="text-white/40 text-xs font-light">via Lenco</span>
+              </div>
+>>>>>>> 1de7bf6428721d979a345a66f8aaf96edcd16d64
             </Panel>
           ),
         },
@@ -297,7 +306,7 @@ export default function LandingPage() {
           id: "trade",
           headline: "Trade",
           subheadline: "Freely",
-          body: "Peer-to-peer crypto/naira exchange with the safety of KYC but none of the exposure.",
+          body: "Instant crypto/naira exchange with the safety of KYC but none of the exposure.",
         },
         {
           id: "how-it-works-intro",
@@ -334,7 +343,7 @@ export default function LandingPage() {
           id: "how-it-works-2",
           headline: "Step 2",
           subheadline: "Trustless Escrow",
-          body: "Initiate a trade. Your assets are locked securely in a smart contract. No middleman can access or freeze your funds.",
+          body: "Initiate a swap. Your assets are locked securely in a smart contract. No middleman can access your funds while the bank transfer completes.",
           media: (
             <Panel label="Step 2 · Lock">
               <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-5 text-center">
@@ -348,14 +357,19 @@ export default function LandingPage() {
         {
           id: "how-it-works-3",
           headline: "Step 3",
-          subheadline: "P2P Settlement",
-          body: "Once fiat payment is confirmed, the smart contract instantly releases the crypto to the buyer's wallet. Fast, secure, and private.",
+          subheadline: "Instant Settlement",
+          body: "Once fiat payment is confirmed, the smart contract instantly releases the crypto to the treasury. Fast, secure, and private.",
           media: (
             <Panel label="Step 3 · Settle">
+<<<<<<< HEAD
               <Feature label="Naira payment confirmed" index={0} />
               <Feature label="Crypto released to buyer" index={1} />
+=======
+              <Feature label="Naira payout sent to bank" />
+              <Feature label="Time-lock auto-refunds if failed" />
+>>>>>>> 1de7bf6428721d979a345a66f8aaf96edcd16d64
               <div className="mt-2 rounded-lg border border-[#06ffa5]/20 bg-[#06ffa5]/[0.05] px-4 py-3 text-center">
-                <span className="text-[#06ffa5] text-sm font-mono">✓ SETTLED</span>
+                <span className="text-[#06ffa5] text-sm font-mono">✓ SWAP COMPLETE</span>
               </div>
             </Panel>
           ),
@@ -364,13 +378,20 @@ export default function LandingPage() {
           id: "faq",
           headline: "FAQ",
           subheadline: <RevealText text="Good to Know" />,
-          body: "The questions every P2P trader asks — answered up front.",
+          body: "The questions every Swap user asks — answered up front.",
           media: (
             <div className="w-full p-5 sm:p-6 flex flex-col gap-3 justify-center">
+<<<<<<< HEAD
               <Faq q="What if the buyer doesn't pay?" a="Your crypto stays locked in escrow and unpaid trades auto-cancel — nothing is released without confirmed payment." index={0} />
               <Faq q="Is ShieldPass custodial?" a="No. Funds sit in a smart contract and your passkey never leaves your device — we can't touch either." index={1} />
               <Faq q="I lost my device — can I recover?" a="A passkey is device-bound. Add a backup signer to your wallet so a lost device doesn't mean lost funds." index={2} />
               <Faq q="What does it cost?" a="Transactions are gasless — fees are sponsored, so you don't need any XLM to trade on testnet." index={3} />
+=======
+              <Faq q="What if the fiat doesn't arrive?" a="Your crypto stays locked in the escrow time-lock. If the bank transfer fails, the contract refunds your crypto automatically after 1 hour." />
+              <Faq q="Is ShieldPass custodial?" a="No. Funds sit in a smart contract and your passkey never leaves your device — we can't touch either." />
+              <Faq q="I lost my device — can I recover?" a="A passkey is device-bound. Add a backup signer to your wallet so a lost device doesn't mean lost funds." />
+              <Faq q="What does it cost?" a="Transactions are gasless — fees are sponsored, so you don't need any XLM to trade on testnet." />
+>>>>>>> 1de7bf6428721d979a345a66f8aaf96edcd16d64
             </div>
           ),
         },
@@ -407,7 +428,7 @@ export default function LandingPage() {
         dark: "#0a0a0a",
       }}
       logo="SHIELDPASS"
-      menuItems={["Marketplace", "Dashboard", "Onboarding", "About", "Docs"]}
+      menuItems={["Swap", "Dashboard", "Onboarding", "About", "Docs"]}
     />
   );
 }

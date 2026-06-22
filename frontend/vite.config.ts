@@ -22,7 +22,7 @@ export default defineConfig({
       { find: '@aztec/bb.js', replacement: bbBrowser },
       {
         find: /^@shieldpass\/sdk\/dist\/(.+)$/,
-        replacement: path.resolve(import.meta.dirname, '../sdk/src/$1.ts'),
+        replacement: path.resolve(import.meta.dirname, '../SDK/src/$1.ts'),
       },
     ],
     dedupe: ['@aztec/bb.js'],

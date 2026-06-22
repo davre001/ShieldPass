@@ -21,11 +21,11 @@ export class TrustedIssuer {
     /**
      * Generates a leaf commitment by hashing the user's private attributes,
      * exactly as the circuit reconstructs it:
-     *   leaf = poseidon4([secret_salt, is_human, bvn_verified, good_standing])
+     *   leaf = poseidon4([secret_salt, hardware_attested, bvn_verified, good_standing])
      */
-    generateLeaf(secretSalt: bigint, isHuman: boolean, bvnVerified: boolean, goodStanding: boolean): string {
+    generateLeaf(secretSalt: bigint, hardwareAttested: boolean, bvnVerified: boolean, goodStanding: boolean): string {
         if (typeof secretSalt !== 'bigint') throw new Error('secretSalt must be a bigint');
-        return computeLeaf(secretSalt, isHuman ? 1 : 0, bvnVerified ? 1 : 0, goodStanding ? 1 : 0);
+        return computeLeaf(secretSalt, hardwareAttested ? 1 : 0, bvnVerified ? 1 : 0, goodStanding ? 1 : 0);
     }
 
     /**

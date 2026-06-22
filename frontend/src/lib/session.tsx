@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { PasskeyWalletClient } from '@shieldpass/sdk/dist/passkey'
 
@@ -11,6 +11,7 @@ interface SessionState {
   wallet: PasskeyWalletClient | null
   keyId: string
   address: string | null // C-address smart wallet
+  bvnVerified: boolean
 }
 
 export interface Session extends SessionState {
@@ -23,6 +24,7 @@ const EMPTY: SessionState = {
   email: '', name: '', phone: '',
   secretSalt: null, merkleRoot: null,
   wallet: null, keyId: '', address: null,
+  bvnVerified: false,
 }
 
 const STORAGE_KEY = 'shieldpass_session'
@@ -52,6 +54,18 @@ const SessionCtx = createContext<Session | null>(null)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>(loadPersisted)
+
+  // Re-hydrate the wallet instance on page reload if keyId exists.
+  useEffect(() => {
+    if (state.keyId && !state.wallet) {
+      import('./passkey').then(({ makeWallet }) => {
+        makeWallet().then(w => {
+          setState(s => { const next = { ...s, wallet: w }; savePersisted(next); return next; })
+        }).catch(console.error)
+      }).catch(console.error)
+    }
+  }, [state.keyId, state.wallet])
+
   const value: Session = {
     ...state,
     onboarded: !!(state.secretSalt && state.address),

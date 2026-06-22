@@ -6,12 +6,16 @@ import { useSession } from "../lib/session";
 import { makeWallet, submitSigned } from "../lib/passkey";
 import { humanizeError } from "@shieldpass/sdk/dist/errors";
 
+<<<<<<< HEAD
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { ChevronLeftIcon, Grid2x2PlusIcon } from "lucide-react";
 import { AnimatedLayout } from "../components/ui/animated-characters-login-page";
 
 type Stage = "info" | "verifying" | "confirm" | "passkey" | "deploying" | "done" | "error";
+=======
+type Stage = "info" | "passkey" | "deploying" | "done" | "error";
+>>>>>>> 1de7bf6428721d979a345a66f8aaf96edcd16d64
 
 const fadeUp = {
   hidden: { opacity: 0, y: 10, filter: "blur(4px)" },
@@ -24,28 +28,10 @@ export default function OnboardingPage() {
 
   const [stage, setStage] = useState<Stage>("info");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
-  const [bvn, setBvn] = useState("");
-  const [legalName, setLegalName] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const infoValid = /\S+@\S+\.\S+/.test(email) && /^\d{4,6}$/.test(pin);
-  const bvnValid = /^\d{11}$/.test(bvn);
-
-  async function verify() {
-    setErrorMessage(null);
-    setStage("verifying");
-    try {
-      const r = await api.submitBvn({ email, phone, bvn, pin });
-      setLegalName(r.returnedName);
-      session.set({ email, phone, name: r.returnedName, secretSalt: r.secretSalt, merkleRoot: r.merkleRoot });
-      setStage("confirm");
-    } catch (err) {
-      setStage("error");
-      setErrorMessage(humanizeError(err).title);
-    }
-  }
 
   const [isTyping, setIsTyping] = useState(false);
 
@@ -53,11 +39,47 @@ export default function OnboardingPage() {
     setErrorMessage(null);
     setStage("deploying");
     try {
-      const wallet = await makeWallet();
-      const res = await wallet.createWallet("ShieldPass", email);
-      await submitSigned(res.signedDeployXdr);
-      await api.linkWallet({ email, smartWalletAddress: res.contractId, passkeyKeyId: res.keyId });
-      session.set({ wallet, keyId: res.keyId, address: res.contractId });
+      let check;
+      try {
+        check = await api.verifyPin({ email, pin });
+      } catch (e: any) {
+        if (e.message && e.message.includes("No user")) check = null;
+        else throw e;
+      }
+
+      if (check && !check.ok) {
+        throw new Error("Incorrect PIN for existing account.");
+      }
+
+      let wallet, keyId, address, secretSalt, merkleRoot, bvnVerified = false;
+
+      if (check?.ok && check.passkeyKeyId && check.smartWalletAddress) {
+        // --- LOGIN FLOW ---
+        wallet = await makeWallet();
+        await wallet.connectWallet(check.passkeyKeyId); // Prompts Face ID / Touch ID
+        
+        const reissue = await api.reissueSalt({ email, pin });
+        keyId = check.passkeyKeyId;
+        address = check.smartWalletAddress;
+        secretSalt = reissue.secretSalt;
+        merkleRoot = reissue.merkleRoot;
+        bvnVerified = reissue.bvnVerified;
+      } else {
+        // --- SIGNUP FLOW ---
+        wallet = await makeWallet();
+        const res = await wallet.createWallet("ShieldPass", email);
+        await submitSigned(res.signedDeployXdr);
+        
+        const linkRes = await api.linkWallet({ email, pin, smartWalletAddress: res.contractId, passkeyKeyId: res.keyId });
+        keyId = res.keyId;
+        address = res.contractId;
+        secretSalt = linkRes.secretSalt;
+        merkleRoot = linkRes.merkleRoot;
+      }
+      
+      session.set({ 
+        wallet, keyId, address, email, secretSalt, merkleRoot, bvnVerified
+      });
       setStage("done");
     } catch (err) {
       setStage("error");
@@ -93,6 +115,7 @@ export default function OnboardingPage() {
           </p>
         </div>
 
+<<<<<<< HEAD
         <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.1 } } }}>
           {stage === "info" && (
             <motion.div variants={fadeUp} className="space-y-4">
@@ -214,6 +237,66 @@ function FloatingPaths({ position }: { position: number }) {
           />
         ))}
       </svg>
+=======
+        <motion.p variants={fadeUp} className="font-mono text-xs uppercase tracking-widest text-indigo-400 mb-4 font-semibold">
+          Web2 Onboarding
+        </motion.p>
+        <motion.h1 variants={fadeUp} className="geist-heading text-3xl md:text-4xl mb-4 bg-gradient-to-r from-white via-white to-white/60 bg-clip-text text-transparent font-medium">
+          {stage === "done" ? "You're live" : "Create your account"}
+        </motion.h1>
+        <motion.p variants={fadeUp} className="text-white/60 text-sm mb-10 leading-relaxed font-light">
+          No seed phrases. Secure your account with Face ID / fingerprint. Your smart wallet deploys silently.
+        </motion.p>
+
+        {stage === "info" && (
+          <motion.div variants={fadeUp} className="space-y-5 relative z-10">
+            <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+            <input className={inputCls} inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="Create a 4-6 digit PIN" />
+            <button className={infoValid ? btnPrimary : btnDisabled} disabled={!infoValid} onClick={() => setStage("passkey")}>Continue</button>
+          </motion.div>
+        )}
+
+        {(stage === "passkey" || stage === "deploying") && (
+          <motion.div variants={fadeUp} className="space-y-6 relative z-10">
+            <p className="text-white/70 text-sm">Secure your account with Face ID / fingerprint. Your wallet deploys silently — gasless.</p>
+            <p className="text-white/40 text-xs">No fingerprint or Face ID? Use your Windows Hello PIN, or scan the prompt's QR with your phone.</p>
+            <button className={stage === "deploying" ? btnDisabled : btnPrimary} disabled={stage === "deploying"} onClick={createPasskey}>
+              {stage === "deploying" ? "Authenticating…" : "Secure Account"}
+            </button>
+          </motion.div>
+        )}
+
+        {stage === "error" && (
+          <motion.div variants={fadeUp} className="space-y-4 relative z-10">
+            <p className="text-sm text-red-400 font-medium">{errorMessage}</p>
+            <button className={btnPrimary} onClick={() => setStage("passkey")}>Try again</button>
+          </motion.div>
+        )}
+
+        {stage === "done" && (
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }} className="border border-green-500/20 bg-green-500/[0.02] rounded-2xl p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full blur-2xl pointer-events-none" />
+            <p className="text-green-400 text-sm font-semibold mb-6 flex items-center gap-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              Account Secured
+            </p>
+            <dl className="space-y-4 font-mono text-xs text-white/70">
+              <div>
+                <dt className="mb-2 text-white/40 uppercase tracking-wider text-[10px]">Smart wallet (passkey)</dt>
+                <dd className="break-all border border-white/5 bg-white/[0.01] p-3.5 rounded-lg text-white font-mono select-all">{session.address}</dd>
+              </div>
+            </dl>
+            <button onClick={() => navigate("/swap")} className="mt-8 w-full font-semibold px-6 py-4 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-500/20 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2">
+              Start Swapping
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+            </button>
+          </motion.div>
+        )}
+      </motion.div>
+>>>>>>> 1de7bf6428721d979a345a66f8aaf96edcd16d64
     </div>
   );
 }

@@ -19,19 +19,52 @@ model User {
   pinHash            String?
   createdAt          DateTime @default(now())
   attestation        ComplianceAttestation?
+  bankAccounts       BankAccount[]
+  swaps              Swap[]
+}
+
+// A user's saved Naira payout destination. Funds from a completed swap land here.
+model BankAccount {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  bankName      String
+  accountNumber String
+  accountName   String
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  swaps         Swap[]
 }
 
 model ComplianceAttestation {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id])
-  leafIndex       Int
-  leafCommitment  String
-  merkleRoot      String   @default("0") // Real Poseidon root the circuit verifies against
-  isHuman         Boolean  @default(true)
-  bvnVerified     Boolean  @default(true)
-  goodStanding    Boolean  @default(true)
-  createdAt       DateTime @default(now())
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+  leafIndex        Int
+  leafCommitment   String
+  merkleRoot       String   @default("0") // Real Poseidon root the circuit verifies against
+  hardwareAttested Boolean  @default(true)  // Tier 1: passkey hardware attestation (set at link-wallet)
+  bvnVerified      Boolean  @default(false) // Tier 2: BVN verified (only after /submit-bvn upgrade)
+  goodStanding     Boolean  @default(true)
+  createdAt        DateTime @default(now())
+}
+
+// The Trustless Instant Swap lifecycle (crypto -> Naira off-ramp).
+// status: LOCKED_ON_CHAIN | FIAT_PROCESSING | COMPLETED | REFUNDED
+model Swap {
+  id              String      @id @default(uuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+  bankAccountId   String
+  bankAccount     BankAccount @relation(fields: [bankAccountId], references: [id])
+  tokenAddress    String      // Any Stellar asset contract (USDC, XLM SAC, AQUA, ...)
+  cryptoAmount    Float
+  nairaAmount     Float
+  status          String      @default("LOCKED_ON_CHAIN")
+  swapId          String?     // on-chain swap id returned by lock_swap
+  txHash          String?
+  lencoTransferId String?
+  createdAt       DateTime    @default(now())
 }
 
 // Spent ZK nullifiers — enforces single-use of each compliance proof (replay protection).
@@ -43,17 +76,6 @@ model Nullifier {
   usedAt        DateTime @default(now())
 }
 
-model P2POffer {
-  id              String   @id @default(uuid())
-  sellerWallet    String
-  assetType       String   // USDC, XLM, NGNC
-  cryptoAmount    String
-  nairaRate       String
-  bankDetails     String   // e.g. "GTBank 0123456789"
-  status          String   @default("open") // open | locked | completed | canceled
-  createdAt       DateTime @default(now())
-}
-
 model RelayerTransaction {
   id              String   @id @default(uuid())
   walletAddress   String
@@ -61,28 +83,6 @@ model RelayerTransaction {
   txHash          String   @unique
   status          String   // pending | success | failed
   createdAt       DateTime @default(now())
-}
-
-// A single P2P deal and its settlement state machine.
-// status: OPEN | AWAITING_PAYMENT | PAID | CRYPTO_SENT | SETTLED | CANCELLED | DISPUTED
-model Trade {
-  id                 String   @id @default(uuid())
-  status             String   @default("OPEN")
-  assetType          String   // USDC | XLM | NGNC
-  cryptoAmount       String
-  nairaRate          String
-  expectedAmount     String   // total Naira expected = cryptoAmount * nairaRate
-  sellerWallet       String
-  sellerBankAccount  String   // e.g. "GTBank 0123456789"
-  buyerWallet        String?
-  escrowOfferId      String?  // on-chain offer id from create_offer
-  virtualAccountRef  String?  // payment-processor virtual account reference
-  releaseTxHash      String?  // Stellar tx that released crypto to the buyer
-  payoutRef          String?  // payout reference for Naira sent to the seller
-  createdAt          DateTime @default(now())
-  paidAt             DateTime?
-  settledAt          DateTime?
-  expiresAt          DateTime?
 }
 
 // Idempotency ledger: every processed webhook event id is recorded once.

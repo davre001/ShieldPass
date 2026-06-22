@@ -45,8 +45,8 @@ export class ShieldPassProver {
 
         // Validate required fields before running the expensive circuit
         const required: (keyof KYCProofParams)[] = [
-            'secret_salt', 'is_human', 'bvn_verified', 'good_standing',
-            'merkle_path', 'merkle_indices', 'merkle_root', 'current_timestamp', 'nullifier'
+            'secret_salt', 'hardware_attested', 'bvn_verified', 'good_standing',
+            'merkle_path', 'merkle_indices', 'merkle_root', 'current_timestamp', 'nullifier', 'require_bvn'
         ];
         for (const field of required) {
             if (params[field] === undefined || params[field] === null || params[field] === '') {

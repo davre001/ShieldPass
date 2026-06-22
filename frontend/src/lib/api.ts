@@ -1,4 +1,4 @@
-import type { Trade, HistoryItem } from '../types';
+import type { BankAccount, Quote, SwapRecord } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -16,44 +16,46 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ── Real backend client ──
 export const api = {
-  submitBvn: (input: { email: string; phone?: string; bvn: string; pin: string }) =>
-    request<{ success: boolean; returnedName: string; secretSalt: string; merkleRoot: string; leafIndex: number }>(
+  // Tier 1: passkey-first onboarding. Links the smart wallet and returns the compliance salt.
+  linkWallet: (input: { email: string; pin?: string; smartWalletAddress: string; passkeyKeyId?: string }) =>
+    request<{ success: boolean; tier: number; secretSalt: string; merkleRoot: string; leafIndex: number }>(
+      '/kyc/link-wallet', { method: 'POST', body: JSON.stringify(input) }),
+
+  // Tier 2: BVN upgrade for high-value swaps. Returns a NEW (bvn-verified) compliance salt.
+  submitBvn: (input: { email: string; phone?: string; bvn: string }) =>
+    request<{ success: boolean; tier: number; returnedName: string; secretSalt: string; merkleRoot: string; leafIndex: number }>(
       '/kyc/submit-bvn', { method: 'POST', body: JSON.stringify(input) }),
 
   verifyPin: (input: { email: string; pin: string }) =>
-    request<{ ok: boolean }>('/kyc/verify-pin', { method: 'POST', body: JSON.stringify(input) }),
+    request<{ ok: boolean; passkeyKeyId?: string; smartWalletAddress?: string }>('/kyc/verify-pin', { method: 'POST', body: JSON.stringify(input) }),
 
   // Login on a new device: recover the account from the wallet the passkey identified.
   getAccount: (wallet: string) =>
-    request<{ email: string; name: string | null; phone: string | null }>(
+    request<{ email: string; name: string | null; phone: string | null; bvnVerified: boolean }>(
       `/kyc/account?wallet=${encodeURIComponent(wallet)}`),
 
   // Login on a new device: mint a fresh compliance salt (the salt is client-only, unrecoverable).
   reissueSalt: (input: { email: string; pin: string }) =>
-    request<{ success: boolean; secretSalt: string; merkleRoot: string; leafIndex: number }>(
+    request<{ success: boolean; bvnVerified: boolean; secretSalt: string; merkleRoot: string; leafIndex: number }>(
       '/kyc/reissue-salt', { method: 'POST', body: JSON.stringify(input) }),
 
-  linkWallet: (input: { email: string; smartWalletAddress: string; passkeyKeyId?: string }) =>
-    request<{ success: boolean }>('/kyc/link-wallet', { method: 'POST', body: JSON.stringify(input) }),
+  // ── Bank accounts ──
+  listBanks: (email: string) =>
+    request<BankAccount[]>(`/banks?email=${encodeURIComponent(email)}`),
 
-  listTrades: () => request<Trade[]>('/p2p/trades'),
+  addBank: (input: { email: string; bankName: string; accountNumber: string; accountName: string; isDefault?: boolean }) =>
+    request<{ success: boolean; account: BankAccount }>('/banks', { method: 'POST', body: JSON.stringify(input) }),
 
-  getTrade: (id: string) => request<Trade>(`/p2p/trades/${id}`),
+  // ── Swap ──
+  quote: (input: { tokenAddress: string; cryptoAmount: number; assetCode?: string }) =>
+    request<Quote>('/swap/quote', { method: 'POST', body: JSON.stringify(input) }),
 
-  getHistory: (wallet: string, status?: string, page = 1, limit = 20) =>
-    request<HistoryItem[]>(`/p2p/history?wallet=${encodeURIComponent(wallet)}${status ? `&status=${status}` : ''}&page=${page}&limit=${limit}`),
+  executeSwap: (input: {
+    email: string; bankAccountId: string; tokenAddress: string; cryptoAmount: number; assetCode?: string;
+    onChainSwapId: string; proof: string; publicInputs: string[]; nullifier: string;
+  }) => request<{ success: boolean; swap: SwapRecord; payout: { amountNaira: number; bank: string; transferId: string }; message: string }>(
+    '/swap/execute', { method: 'POST', body: JSON.stringify(input) }),
 
-  getActive: (wallet: string) =>
-    request<HistoryItem[]>(`/p2p/trades/active?wallet=${encodeURIComponent(wallet)}`),
-
-  createTrade: (input: {
-    sellerWallet: string; assetType: string; cryptoAmount: string; nairaRate: string;
-    sellerBankAccount: string; escrowOfferId: string;
-    proof: string; publicInputs: string[]; nullifier: string;
-  }) => request<{ success: boolean; trade: Trade }>('/p2p/trades', { method: 'POST', body: JSON.stringify(input) }),
-
-  acceptTrade: (id: string, input: {
-    buyerWallet: string; buyerEmail: string; proof: string; publicInputs: string[]; nullifier: string;
-  }) => request<{ success: boolean; trade: Trade; payTo: { accountNumber: string; bankName: string; amount: string }; message: string }>(
-    `/p2p/trades/${id}/accept`, { method: 'POST', body: JSON.stringify(input) }),
+  swapHistory: (email: string) =>
+    request<SwapRecord[]>(`/swap/history?email=${encodeURIComponent(email)}`),
 };

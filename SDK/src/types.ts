@@ -33,15 +33,16 @@ export interface ShieldPassConfig {
 
 /** Inputs that match main() in reusable_kyc/src/main.nr */
 export interface KYCProofParams {
-    secret_salt: string;       // Private: never sent to server
-    is_human: string;          // '1' or '0'
-    bvn_verified: string;      // '1' or '0'
-    good_standing: string;     // '1' or '0'
-    merkle_path: string[];     // Array of DEPTH field elements
-    merkle_indices: string[];  // Array of DEPTH 0/1 indices
-    merkle_root: string;       // Public: the published tree root
-    current_timestamp: string; // Public: rounded timestamp
-    nullifier: string;         // Public: poseidon(secret_salt, timestamp)
+    secret_salt: string;        // Private: never sent to server
+    hardware_attested: string;  // '1' or '0' — Tier 1 passkey hardware attestation
+    bvn_verified: string;       // '1' or '0' — Tier 2 BVN flag
+    good_standing: string;      // '1' or '0'
+    merkle_path: string[];      // Array of DEPTH field elements
+    merkle_indices: string[];   // Array of DEPTH 0/1 indices
+    merkle_root: string;        // Public: the published tree root
+    current_timestamp: string;  // Public: rounded timestamp
+    nullifier: string;          // Public: poseidon(secret_salt, timestamp)
+    require_bvn: string;        // Public: '1' enforces bvn_verified (Tier 2), '0' for Tier 1
 }
 
 export interface ZKProofResult {
@@ -55,6 +56,14 @@ export interface CreateOfferParams {
     tokenAddress: string;   // Stellar asset contract address
     amount: bigint;
     nullifier: string;      // ZK nullifier proving seller passed KYC
+}
+
+/** Params for lock_swap on the Trustless Swap contract. */
+export interface LockSwapParams {
+    userWallet: string;     // Soroban address (G... or C... smart wallet) locking the crypto
+    tokenAddress: string;   // Any Stellar asset contract address (USDC, XLM SAC, AQUA, ...)
+    amount: bigint;
+    nullifier: string;      // ZK nullifier proving the user passed (progressive) KYC
 }
 
 /** Shape returned by the backend relayer's POST /verify/submit-proof. */
