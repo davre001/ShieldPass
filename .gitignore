@@ -12,9 +12,9 @@ Verifier.toml
 .env
 .env.local
 
-# Database (SQLite)
-backend/dev.db
-backend/dev.db-journal
+# Database (SQLite) — Prisma writes the dev db under backend/prisma/
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
 
 # Compiled TypeScript
 backend/dist/
@@ -26,4 +26,10 @@ dist/
 .idea/
 Thumbs.db
 
+# Test Files
+test-frontend.html
+
 contract_details.md
+frontend-tester
+docs
+

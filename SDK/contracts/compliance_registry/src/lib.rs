@@ -5,6 +5,7 @@ use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env};
 pub enum DataKey {
     Admin,
     MerkleRoot,
+    Nullifier(BytesN<32>),
 }
 
 #[contract]
@@ -31,4 +32,24 @@ impl ComplianceRegistry {
     pub fn get_root(env: Env) -> BytesN<32> {
         env.storage().instance().get(&DataKey::MerkleRoot).unwrap_or(BytesN::from_array(&env, &[0; 32]))
     }
+
+    /// Records a verified nullifier after the relayer has validated the ZK proof.
+    /// Only the admin (relayer service) can call this.
+    /// Prevents double-use of the same nullifier (replay protection).
+    pub fn record_verified_nullifier(env: Env, nullifier: BytesN<32>) {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        admin.require_auth();
+
+        let key = DataKey::Nullifier(nullifier.clone());
+        assert!(!env.storage().persistent().has(&key), "nullifier already used");
+        env.storage().persistent().set(&key, &true);
+    }
+
+    /// Public getter — returns true if the nullifier has been recorded (i.e., the
+    /// user has been verified). Used by p2p_escrow to gate trade initiation.
+    pub fn is_verified(env: Env, nullifier: BytesN<32>) -> bool {
+        let key = DataKey::Nullifier(nullifier);
+        env.storage().persistent().has(&key)
+    }
 }
+

@@ -9,7 +9,7 @@ export default function AboutPage() {
         transition={{ duration: 0.8 }}
         className="text-4xl md:text-5xl font-bold text-white mb-6 font-display"
       >
-        About ShieldPass.zk
+        About ShieldPass
       </motion.h1>
       <motion.p 
         initial={{ opacity: 0, y: 20 }}

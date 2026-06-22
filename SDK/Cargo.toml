@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "contracts/*"
+    "contracts/shielded_pool"
 ]
 
 [profile.release]
@@ -11,3 +11,7 @@ opt-level = "z"
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
+
+# Shared test dependencies across all contracts
+[workspace.dependencies]
+soroban-sdk = { version = "25.0.0", features = ["testutils"] }

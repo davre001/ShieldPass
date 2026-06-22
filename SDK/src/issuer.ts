@@ -1,52 +1,57 @@
-// @ts-ignore
-import { buildPoseidon } from 'circomlibjs';
+/**
+ * ShieldPass Issuer Service
+ * Responsible for generating the KYC leaf commitment and Merkle path
+ * for a user who has passed identity verification.
+ *
+ * Uses the shared Poseidon (BN254) module so every commitment/root it
+ * produces satisfies the Noir circuit's assertions. See poseidon.ts.
+ */
+import { randomBytes } from 'crypto';
+import { computeLeaf, computeMerkleRoot } from './poseidon';
+
+export const DEPTH = 8; // Must match `global DEPTH: u32 = 8` in main.nr
+
+export interface MerkleProof {
+    merkle_path: string[];
+    merkle_indices: string[];
+    merkle_root: string;
+}
 
 export class TrustedIssuer {
-    private poseidon: any;
-
-    async init() {
-        // Initialize the Poseidon hash function used by Noir and Soroban
-        this.poseidon = await buildPoseidon();
+    /**
+     * Generates a leaf commitment by hashing the user's private attributes,
+     * exactly as the circuit reconstructs it:
+     *   leaf = poseidon4([secret_salt, is_human, bvn_verified, good_standing])
+     */
+    generateLeaf(secretSalt: bigint, isHuman: boolean, bvnVerified: boolean, goodStanding: boolean): string {
+        if (typeof secretSalt !== 'bigint') throw new Error('secretSalt must be a bigint');
+        return computeLeaf(secretSalt, isHuman ? 1 : 0, bvnVerified ? 1 : 0, goodStanding ? 1 : 0);
     }
 
     /**
-     * Step 1: The Issuer checks the user's real-world ID (e.g. via Onfido)
-     * If they pass, the Issuer hashes their status and their secret password into a Leaf.
+     * Builds a single-leaf Merkle inclusion proof whose root is computed with the
+     * SAME Poseidon used by the circuit, so the resulting proof actually verifies.
+     *
+     * For the hackathon the user sits at the leftmost slot with all-zero siblings;
+     * the root is the real Poseidon fold of that path (NOT a placeholder `0`).
+     * In production this returns the genuine inclusion path from the off-chain tree.
      */
-    generateLeaf(secretSalt: bigint, kycPassed: boolean, notSanctioned: boolean): string {
-        const kycVal = kycPassed ? 1n : 0n;
-        const sanctionVal = notSanctioned ? 1n : 0n;
-        
-        // Hash the three private inputs
-        const hash = this.poseidon([secretSalt, kycVal, sanctionVal]);
-        return this.poseidon.F.toString(hash);
+    generateMerkleProof(leaf: string): MerkleProof {
+        if (!leaf || leaf.length === 0) throw new Error('Leaf commitment is required');
+
+        const merkle_path = Array(DEPTH).fill('0');
+        const merkle_indices = Array(DEPTH).fill('0');
+        const merkle_root = computeMerkleRoot(leaf, merkle_path, merkle_indices);
+
+        return { merkle_path, merkle_indices, merkle_root };
     }
 
     /**
-     * Step 2: The Issuer takes all approved users, builds a Merkle Tree, 
-     * and publishes the Merkle Root to the Soroban Smart Contract.
+     * Generates a fresh cryptographically-random secret salt for a new user.
+     * Returned to the user ONCE and never stored server-side.
      */
-    generateMockMerkleTree(leaves: string[]): string {
-        console.log(`[Issuer] Building Merkle Tree for ${leaves.length} compliant citizens...`);
-        
-        if (leaves.length === 0) return "0";
-
-        let currentLevel = leaves.map(l => BigInt(l));
-        
-        // Simple binary tree hashing up to the root
-        while (currentLevel.length > 1) {
-            const nextLevel: bigint[] = [];
-            for (let i = 0; i < currentLevel.length; i += 2) {
-                const left = currentLevel[i];
-                const right = i + 1 < currentLevel.length ? currentLevel[i+1] : left; // duplicate if odd
-                const parentHash = this.poseidon([left, right]);
-                nextLevel.push(parentHash);
-            }
-            currentLevel = nextLevel;
-        }
-        
-        const root = this.poseidon.F.toString(currentLevel[0]);
-        console.log(`[Issuer] Published New Compliance Root: ${root}`);
-        return root;
+    generateSecretSalt(): string {
+        const buf = randomBytes(31); // < BN254 field size, always a valid Field element
+        return BigInt('0x' + buf.toString('hex')).toString();
     }
 }

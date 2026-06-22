@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Icons } from "./icons"
 import { Button } from "./button"
 import { Input } from "./input"
@@ -5,6 +6,17 @@ import { Label } from "./label"
 import { Link } from "react-router-dom"
 
 function StackedCircularFooter() {
+  const [email, setEmail] = useState("")
+  const [subscribed, setSubscribed] = useState(false)
+
+  function handleSubscribe(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim()) return
+    // No newsletter backend yet — acknowledge locally so the button isn't a dead reload.
+    setSubscribed(true)
+    setEmail("")
+  }
+
   return (
     <footer className="w-full border-t border-white/5 bg-[#0c1117] py-12 mt-20 relative z-10 pointer-events-auto">
       <div className="w-full px-6 md:px-12">
@@ -32,20 +44,27 @@ function StackedCircularFooter() {
             </a>
           </div>
           <div className="mb-8 w-full max-w-xl">
-            <form className="flex space-x-2">
-              <div className="flex-grow">
-                <Label htmlFor="email" className="sr-only">Email</Label>
-                <Input 
-                  id="email" 
-                  placeholder="Subscribe to ShieldPass updates" 
-                  type="email" 
-                  className="rounded-full bg-white/5 border-white/10 text-white placeholder:text-white/40 focus-visible:ring-white/20" 
-                />
-              </div>
-              <Button type="submit" className="rounded-full bg-black text-white border border-white/20 hover:bg-white/10">
-                Subscribe
-              </Button>
-            </form>
+            {subscribed ? (
+              <p className="text-center text-sm text-emerald-400 font-light">Thanks — you're on the list.</p>
+            ) : (
+              <form className="flex space-x-2" onSubmit={handleSubscribe}>
+                <div className="flex-grow">
+                  <Label htmlFor="email" className="sr-only">Email</Label>
+                  <Input
+                    id="email"
+                    placeholder="Subscribe to ShieldPass updates"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="rounded-full bg-white/5 border-white/10 text-white placeholder:text-white/40 focus-visible:ring-white/20"
+                  />
+                </div>
+                <Button type="submit" className="rounded-full bg-black text-white border border-white/20 hover:bg-white/10">
+                  Subscribe
+                </Button>
+              </form>
+            )}
           </div>
           <div className="text-center">
             <p className="text-sm text-white/50 font-light">

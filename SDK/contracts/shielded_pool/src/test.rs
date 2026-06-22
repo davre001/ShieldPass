@@ -1,71 +1,94 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation}, Address, BytesN, Env, IntoVal};
-use soroban_sdk::token::Client as TokenClient;
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::token::{StellarAssetClient, TokenClient};
+use soroban_sdk::{Address, BytesN, Env};
 
-// We need a dummy compliance registry for testing the escrow
-#[contract]
-pub struct MockRegistry;
-
-#[contractimpl]
-impl MockRegistry {
-    pub fn is_verified(_env: Env, _nullifier: BytesN<32>) -> bool {
-        // For testing, always return true to simulate a successful ZK proof verification
-        true
-    }
-}
-
-// Dummy token for testing
-mod token_contract {
-    soroban_sdk::contractimport!(file = "../../target/wasm32-unknown-unknown/release/soroban_token_contract.wasm");
-}
-
-fn create_token_contract<'a>(e: &Env, admin: &Address) -> TokenClient<'a> {
-    // In a real test we would register the Stellar Asset Contract, but for simplicity here
-    // we just use a placeholder if we had a full token WASM.
-    // Instead, we can use the built-in test utilities.
-    // However, Soroban tests require the actual token contract to be registered.
-    unimplemented!()
+fn setup_token<'a>(env: &Env, admin: &Address) -> (Address, TokenClient<'a>, StellarAssetClient<'a>) {
+    let sac = env.register_stellar_asset_contract_v2(admin.clone());
+    let addr = sac.address();
+    (addr.clone(), TokenClient::new(env, &addr), StellarAssetClient::new(env, &addr))
 }
 
 #[test]
-fn test_create_and_release_offer() {
+fn test_get_offer_count() {
     let env = Env::default();
     env.mock_all_auths();
 
+    let arbiter = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+
+    let (token_addr, _token, token_admin_client) = setup_token(&env, &token_admin);
+    token_admin_client.mint(&seller, &1_000);
+
+    let escrow_id = env.register(P2PEscrow, ());
+    let escrow = P2PEscrowClient::new(&env, &escrow_id);
+    escrow.init(&arbiter);
+
+    assert_eq!(escrow.get_offer_count(), 0);
+
+    let nullifier = BytesN::from_array(&env, &[1u8; 32]);
+    escrow.create_offer(&seller, &token_addr, &100, &nullifier);
+    assert_eq!(escrow.get_offer_count(), 1);
+}
+
+#[test]
+fn test_create_then_arbiter_releases_to_buyer() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let arbiter = Address::generate(&env);
     let seller = Address::generate(&env);
     let buyer = Address::generate(&env);
-    
-    // 1. Register Mock Registry
-    let registry_id = env.register_contract(None, MockRegistry);
-    
-    // 2. Register P2P Escrow
-    let escrow_id = env.register_contract(None, P2PEscrow);
-    let escrow_client = P2PEscrowClient::new(&env, &escrow_id);
-    
-    // Initialize Escrow
-    escrow_client.init(&registry_id);
+    let token_admin = Address::generate(&env);
 
-    // Note: To fully test the token transfer, we need to setup the Soroban Token Contract 
-    // and mint tokens to the seller. For the hackathon, testing the structural flow of 
-    // the contract interactions is often sufficient before deploying to testnet.
-    
-    /* 
-    let token_id = ... setup token ...
-    
-    let nullifier = BytesN::from_array(&env, &[0; 32]);
-    let amount: i128 = 1000;
-    
-    // Seller creates offer
-    let offer_id = escrow_client.create_offer(&seller, &token_id, &amount, &nullifier);
-    
-    // Assert offer exists and counter incremented
+    let (token_addr, token, token_admin_client) = setup_token(&env, &token_admin);
+    token_admin_client.mint(&seller, &1_000);
+
+    let escrow_id = env.register(P2PEscrow, ());
+    let escrow = P2PEscrowClient::new(&env, &escrow_id);
+    escrow.init(&arbiter);
+
+    let nullifier = BytesN::from_array(&env, &[7u8; 32]);
+    let offer_id = escrow.create_offer(&seller, &token_addr, &600, &nullifier);
     assert_eq!(offer_id, 1);
-    
-    // Release crypto to buyer
-    escrow_client.release_crypto(&offer_id, &buyer);
-    
-    // Assert balances changed ...
-    */
+
+    // Crypto is now locked in the contract, not with the seller.
+    assert_eq!(token.balance(&seller), 400);
+    assert_eq!(token.balance(&escrow_id), 600);
+
+    // Arbiter releases to the buyer.
+    escrow.release_crypto(&offer_id, &buyer);
+    assert_eq!(token.balance(&buyer), 600);
+    assert_eq!(token.balance(&escrow_id), 0);
+    assert!(!escrow.get_offer(&offer_id).is_active);
+}
+
+#[test]
+#[should_panic]
+fn test_seller_cannot_release() {
+    let env = Env::default();
+
+    let arbiter = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+
+    let (token_addr, _token, token_admin_client) = setup_token(&env, &token_admin);
+    token_admin_client.mint(&seller, &1_000);
+
+    let escrow_id = env.register(P2PEscrow, ());
+    let escrow = P2PEscrowClient::new(&env, &escrow_id);
+
+    // Authorize only what the happy path needs (init + create_offer), NOT the release.
+    env.mock_all_auths();
+    escrow.init(&arbiter);
+    let nullifier = BytesN::from_array(&env, &[7u8; 32]);
+    let offer_id = escrow.create_offer(&seller, &token_addr, &600, &nullifier);
+
+    // Drop all authorizations: the arbiter has not authorized, so release must panic.
+    env.set_auths(&[]);
+    escrow.release_crypto(&offer_id, &buyer);
 }

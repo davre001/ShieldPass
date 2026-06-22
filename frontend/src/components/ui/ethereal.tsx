@@ -19,6 +19,7 @@ interface Section {
   body: React.ReactNode;
   action?: React.ReactNode;
   mediaUrl?: string;
+  media?: React.ReactNode;
 }
 
 interface ColorPalette {
@@ -643,7 +644,7 @@ const ScrollHero: React.FC<ScrollHeroProps> = ({
 
       <nav className="nav-container">
         <div className="nav-inner">
-          <div className="nav-logo">{logo}</div>
+          <Link to="/" className="nav-logo">{logo}</Link>
           <div className="nav-menu">
             {menuItems.map((item, i) => (
               <Link
@@ -720,9 +721,11 @@ const ScrollHero: React.FC<ScrollHeroProps> = ({
                 <div className="section-action mt-8">{section.action}</div>
               )}
             </div>
-            {section.mediaUrl && (
+            {(section.media || section.mediaUrl) && (
               <div className="section-media outline-card">
-                <img src={section.mediaUrl} alt="Section media" className="w-full h-full object-cover mix-blend-lighten opacity-80" />
+                {section.media
+                  ? section.media
+                  : <img src={section.mediaUrl} alt="Section media" className="w-full h-full object-cover mix-blend-lighten opacity-80" />}
               </div>
             )}
           </div>

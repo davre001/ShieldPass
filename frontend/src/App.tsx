@@ -1,12 +1,11 @@
-import { useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
-  Navigate,
 } from "react-router-dom";
 import MainLayout from "./components/MainLayout";
 import WalletConnectButton from "./components/WalletConnectButton";
+import { SessionProvider } from "./lib/session";
 
 // Import all application page views
 import LandingPage from "./pages/LandingPage";
@@ -16,22 +15,18 @@ import TradeRoomPage from "./pages/TradeRoomPage";
 import DashboardPage from "./pages/DashboardPage";
 import AboutPage from "./pages/AboutPage";
 import DocsPage from "./pages/DocsPage";
+import NotFoundPage from "./pages/notfound";
 
 export default function App() {
-  // Lift wallet state globally so the dashboard and trading rooms sync smoothly
-  const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
-
   return (
+    <SessionProvider>
     <Router>
       <Routes>
         {/* The Landing Page renders standalone to maintain its clean, minimal intro design */}
         <Route 
           path="/" 
           element={
-            <LandingPage 
-              connectedAddress={connectedAddress} 
-              onConnect={setConnectedAddress} 
-            />
+            <LandingPage />
           } 
         />
 
@@ -41,10 +36,7 @@ export default function App() {
           element={
             <MainLayout
               walletComponent={
-                <WalletConnectButton
-                  connectedAddress={connectedAddress}
-                  onConnect={setConnectedAddress}
-                />
+                <WalletConnectButton />
               }
             >
               <OnboardingPage />
@@ -57,10 +49,7 @@ export default function App() {
           element={
             <MainLayout
               walletComponent={
-                <WalletConnectButton
-                  connectedAddress={connectedAddress}
-                  onConnect={setConnectedAddress}
-                />
+                <WalletConnectButton />
               }
             >
               <MarketplacePage />
@@ -73,10 +62,7 @@ export default function App() {
           element={
             <MainLayout
               walletComponent={
-                <WalletConnectButton
-                  connectedAddress={connectedAddress}
-                  onConnect={setConnectedAddress}
-                />
+                <WalletConnectButton />
               }
             >
               <TradeRoomPage />
@@ -89,10 +75,7 @@ export default function App() {
           element={
             <MainLayout
               walletComponent={
-                <WalletConnectButton
-                  connectedAddress={connectedAddress}
-                  onConnect={setConnectedAddress}
-                />
+                <WalletConnectButton />
               }
             >
               <DashboardPage />
@@ -105,10 +88,7 @@ export default function App() {
           element={
             <MainLayout
               walletComponent={
-                <WalletConnectButton
-                  connectedAddress={connectedAddress}
-                  onConnect={setConnectedAddress}
-                />
+                <WalletConnectButton />
               }
             >
               <AboutPage />
@@ -121,10 +101,7 @@ export default function App() {
           element={
             <MainLayout
               walletComponent={
-                <WalletConnectButton
-                  connectedAddress={connectedAddress}
-                  onConnect={setConnectedAddress}
-                />
+                <WalletConnectButton />
               }
             >
               <DocsPage />
@@ -132,9 +109,21 @@ export default function App() {
           }
         />
 
-        {/* Fallback Catch-all Route redirecting users to the landing terminal */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Fallback Catch-all Route: show a themed 404 inside the app shell */}
+        <Route
+          path="*"
+          element={
+            <MainLayout
+              walletComponent={
+                <WalletConnectButton />
+              }
+            >
+              <NotFoundPage />
+            </MainLayout>
+          }
+        />
       </Routes>
     </Router>
+    </SessionProvider>
   );
 }

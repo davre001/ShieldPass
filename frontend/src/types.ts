@@ -33,3 +33,21 @@ export interface BankDetails {
   accountName: string;
   accountNumber: string;
 }
+
+export interface Trade {
+  id: string;
+  status: string;
+  assetType: string;
+  cryptoAmount: string;
+  nairaRate: string;
+  expectedAmount: string;
+  sellerWallet: string;
+  buyerWallet: string | null;
+  virtualAccountRef: string | null;
+  releaseTxHash: string | null;
+  payoutRef: string | null;
+}
+
+export interface HistoryItem extends Trade {
+  role: 'buyer' | 'seller';
+}

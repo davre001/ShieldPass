@@ -1,57 +1,112 @@
 import { ShieldPassProver } from './prover';
 import { StellarContractClient } from './stellar';
-import { ShieldPassConfig, PrivatePaymentParams, KYCProofParams, ShieldedNote } from './types';
+import { ShieldPassConfig, KYCProofParams, ZKProofResult, RelayerResponse } from './types';
+import { isValidStellarAddress, proofToHex } from './utils';
 
 export class ShieldPassClient {
     private prover: ShieldPassProver;
     private stellarClient: StellarContractClient;
+    private initialized = false;
 
     constructor(config: ShieldPassConfig) {
-        this.prover = new ShieldPassProver(config.wasmPath);
-        this.stellarClient = new StellarContractClient(config.rpcUrl, config.networkPassphrase, config.contractId);
+        if (!config.contractId) throw new Error('[ShieldPassClient] contractId is required in config.');
+        if (!config.rpcUrl) throw new Error('[ShieldPassClient] rpcUrl is required in config.');
+        if (!config.networkPassphrase) throw new Error('[ShieldPassClient] networkPassphrase is required in config.');
+
+        if (!config.circuit) throw new Error('[ShieldPassClient] config.circuit (compiled reusable_kyc.json) is required.');
+
+        this.prover = new ShieldPassProver(config.circuit);
+        this.stellarClient = new StellarContractClient(
+            config.rpcUrl,
+            config.networkPassphrase,
+            config.contractId
+        );
     }
 
     /**
-     * Initializes the client and loads the WASM/ZK backends.
-     * Must be called before generating proofs.
+     * MUST be called before using the client.
+     * Loads the Barretenberg WASM backend into memory.
      */
     async init() {
+        if (this.initialized) return;
         await this.prover.init();
+        this.initialized = true;
+        console.log('[ShieldPassClient] Initialized and ready.');
+    }
+
+    private assertInitialized() {
+        if (!this.initialized) {
+            throw new Error('[ShieldPassClient] Client not initialized. Call await client.init() first.');
+        }
     }
 
     /**
-     * Generates a reusable KYC compliance proof locally in the browser/node.
-     * @param params User's private identity secrets and the public merkle root.
-     * @returns A ZK Proof and the Compliance Nullifier.
+     * Generates a reusable KYC compliance proof entirely in the browser.
+     * The secret salt NEVER leaves the user's device.
+     * @param params — field names must match main.nr circuit inputs exactly
      */
-    async generateKYCProof(params: KYCProofParams) {
-        console.log("Generating Zero-Knowledge KYC proof locally...");
-        // This proof guarantees identity without revealing the underlying secrets.
-        const proofData = await this.prover.proveKYC(params);
-        return proofData;
+    async generateKYCProof(params: KYCProofParams): Promise<ZKProofResult> {
+        this.assertInitialized();
+        // Validate walletAddress is not in params (it's not a circuit input — keep them separate)
+        console.log('[ShieldPassClient] Generating KYC proof locally...');
+        return await this.prover.proveKYC(params);
     }
 
     /**
-     * Generates a Shielded Payment Proof locally.
-     * @param params Private note secrets, recipient, amount, and the compliance nullifier.
-     * @returns A ZK Proof authorizing the private token transfer.
+     * Verifies the proof client-side before sending to the relayer.
+     * Saves a round-trip if the proof is invalid.
      */
-    async generateShieldedPayment(params: PrivatePaymentParams) {
-        console.log("Generating Zero-Knowledge private payment proof...");
-        const proofData = await this.prover.proveShieldedTransfer(params);
-        return proofData;
+    async verifyProofLocally(proof: Uint8Array, publicInputs: string[]): Promise<boolean> {
+        this.assertInitialized();
+        return await this.prover.verifyProof(proof, publicInputs);
     }
 
     /**
-     * Submits a generated Shielded Payment Proof to the Soroban smart contract.
-     * @param proof The generated proof from `generateShieldedPayment`.
-     * @param spendNullifier The nullifier to prevent double-spending.
-     * @param recipient The destination address.
-     * @param amount The token amount.
+     * Submits the ZK proof to the ShieldPass backend relayer.
+     * The relayer verifies it and submits the Stellar transaction.
+     * @param relayerUrl The backend URL e.g. http://localhost:3001
+     * @param walletAddress The user's Stellar wallet address
+     * @param proofResult The result from generateKYCProof
+     * @param action The contract function to call e.g. 'create_offer'
      */
-    async executePrivatePayment(proof: Uint8Array, spendNullifier: string, recipient: string, amount: bigint) {
-        console.log("Submitting private transaction to Stellar Soroban contract...");
-        const txHash = await this.stellarClient.submitShieldedTransfer(proof, spendNullifier, recipient, amount);
-        return txHash;
+    async submitProofToRelayer(
+        relayerUrl: string,
+        walletAddress: string,
+        proofResult: ZKProofResult,
+        action: string
+    ): Promise<RelayerResponse> {
+        this.assertInitialized();
+
+        if (!isValidStellarAddress(walletAddress)) {
+            throw new Error('[ShieldPassClient] Invalid Stellar wallet address.');
+        }
+        if (!action || action.trim().length === 0) {
+            throw new Error('[ShieldPassClient] Action is required (e.g. "create_offer").');
+        }
+        if (!proofResult.proof || proofResult.proof.length === 0) {
+            throw new Error('[ShieldPassClient] Proof bytes are empty. Generate a proof first.');
+        }
+
+        // Convert Uint8Array proof to hex string for JSON transport
+        const proofHex = proofToHex(proofResult.proof);
+
+        const response = await fetch(`${relayerUrl}/verify/submit-proof`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                walletAddress,
+                proof: proofHex,
+                publicInputs: proofResult.publicInputs,
+                nullifier: proofResult.nullifier,
+                action,
+            }),
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ error: 'Unknown relayer error' }));
+            throw new Error(`[ShieldPassClient] Relayer rejected proof: ${err.error}`);
+        }
+
+        return response.json();
     }
 }

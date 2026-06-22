@@ -8,10 +8,16 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  walletAddress String   @unique
-  createdAt     DateTime @default(now())
-  attestation   ComplianceAttestation?
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  name               String?
+  phone              String?
+  walletAddress      String?  @unique
+  smartWalletAddress String?  @unique
+  passkeyKeyId       String?
+  pinHash            String?
+  createdAt          DateTime @default(now())
+  attestation        ComplianceAttestation?
 }
 
 model ComplianceAttestation {
@@ -20,10 +26,20 @@ model ComplianceAttestation {
   user            User     @relation(fields: [userId], references: [id])
   leafIndex       Int
   leafCommitment  String
+  merkleRoot      String   @default("0") // Real Poseidon root the circuit verifies against
   isHuman         Boolean  @default(true)
   bvnVerified     Boolean  @default(true)
   goodStanding    Boolean  @default(true)
   createdAt       DateTime @default(now())
+}
+
+// Spent ZK nullifiers — enforces single-use of each compliance proof (replay protection).
+model Nullifier {
+  id            String   @id @default(uuid())
+  value         String   @unique
+  walletAddress String
+  action        String
+  usedAt        DateTime @default(now())
 }
 
 model P2POffer {
@@ -44,4 +60,35 @@ model RelayerTransaction {
   txHash          String   @unique
   status          String   // pending | success | failed
   createdAt       DateTime @default(now())
+}
+
+// A single P2P deal and its settlement state machine.
+// status: OPEN | AWAITING_PAYMENT | PAID | CRYPTO_SENT | SETTLED | CANCELLED | DISPUTED
+model Trade {
+  id                 String   @id @default(uuid())
+  status             String   @default("OPEN")
+  assetType          String   // USDC | XLM | NGNC
+  cryptoAmount       String
+  nairaRate          String
+  expectedAmount     String   // total Naira expected = cryptoAmount * nairaRate
+  sellerWallet       String
+  sellerBankAccount  String   // e.g. "GTBank 0123456789"
+  buyerWallet        String?
+  escrowOfferId      String?  // on-chain offer id from create_offer
+  virtualAccountRef  String?  // payment-processor virtual account reference
+  releaseTxHash      String?  // Stellar tx that released crypto to the buyer
+  payoutRef          String?  // payout reference for Naira sent to the seller
+  createdAt          DateTime @default(now())
+  paidAt             DateTime?
+  settledAt          DateTime?
+  expiresAt          DateTime?
+}
+
+// Idempotency ledger: every processed webhook event id is recorded once.
+model WebhookEvent {
+  id              String   @id @default(uuid())
+  providerEventId String   @unique
+  tradeId         String?
+  type            String
+  receivedAt      DateTime @default(now())
 }

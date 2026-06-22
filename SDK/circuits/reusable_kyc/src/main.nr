@@ -1,4 +1,6 @@
-use dep::std;
+// Poseidon (BN254) moved out of the Noir stdlib into the external `poseidon` lib
+// as of Noir 1.0. hash_2 / hash_4 are the same permutation as the old std version.
+use poseidon::poseidon::bn254;
 
 global DEPTH: u32 = 8; // Depth of the Merkle Tree
 
@@ -16,7 +18,7 @@ fn merkle_membership(
             (node, path[i])
         };
         // Use Poseidon hash compatible with Stellar Protocol 25
-        node = std::hash::poseidon::bn254::hash_2([l, r]);
+        node = bn254::hash_2([l, r]);
     }
     node
 }
@@ -33,7 +35,7 @@ fn main(
     nullifier: pub Field
 ) {
     // 1. Reconstruct the leaf commitment from private witnesses
-    let leaf = std::hash::poseidon::bn254::hash_4([
+    let leaf = bn254::hash_4([
         secret_salt, is_human, bvn_verified, good_standing
     ]);
 
@@ -47,6 +49,6 @@ fn main(
     assert(good_standing == 1);
 
     // 4. Generate the Compliance Nullifier (Reusable Pass bound to time)
-    let computed_nullifier = std::hash::poseidon::bn254::hash_2([secret_salt, current_timestamp]);
+    let computed_nullifier = bn254::hash_2([secret_salt, current_timestamp]);
     assert(computed_nullifier == nullifier);
 }
