@@ -105,7 +105,12 @@ router.post('/verify-pin', async (req, res) => {
   if (!email || !pin) return res.status(400).json({ error: 'email and pin are required.' });
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) return res.status(404).json({ error: 'No user for that email.' });
-  return res.json({ ok: !!user.pinHash && verifyPin(String(pin), user.pinHash) });
+  const ok = !!user.pinHash && verifyPin(String(pin), user.pinHash);
+  return res.json({ 
+    ok, 
+    passkeyKeyId: ok ? user.passkeyKeyId : undefined,
+    smartWalletAddress: ok ? user.smartWalletAddress : undefined
+  });
 });
 
 // Re-issue a fresh compliance secret salt for a returning user (login on a new device).

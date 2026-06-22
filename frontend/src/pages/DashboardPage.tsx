@@ -64,6 +64,14 @@ export default function DashboardPage() {
     })();
   }, [address]);
 
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    if (!address) return;
+    navigator.clipboard.writeText(address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   useEffect(() => {
     if (!email) return;
     setHistoryLoading(true);
@@ -96,7 +104,20 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h3 className="font-medium text-white">Passkey Smart Wallet</h3>
-                <p className="text-white/40 text-xs mt-0.5 font-mono">{address ? `${address.slice(0, 8)}…${address.slice(-6)}` : "Not connected"}</p>
+                <div 
+                  className="flex items-center gap-2 mt-0.5 cursor-pointer hover:opacity-80 transition-opacity" 
+                  onClick={handleCopy}
+                  title="Click to copy full address"
+                >
+                  <p className="text-white/40 text-xs font-mono">{address ? `${address.slice(0, 8)}…${address.slice(-6)}` : "Not connected"}</p>
+                  {address && (
+                    copied ? (
+                      <svg className="w-3.5 h-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    )
+                  )}
+                </div>
               </div>
             </div>
           </div>

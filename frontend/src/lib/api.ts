@@ -27,7 +27,7 @@ export const api = {
       '/kyc/submit-bvn', { method: 'POST', body: JSON.stringify(input) }),
 
   verifyPin: (input: { email: string; pin: string }) =>
-    request<{ ok: boolean }>('/kyc/verify-pin', { method: 'POST', body: JSON.stringify(input) }),
+    request<{ ok: boolean; passkeyKeyId?: string; smartWalletAddress?: string }>('/kyc/verify-pin', { method: 'POST', body: JSON.stringify(input) }),
 
   // Login on a new device: recover the account from the wallet the passkey identified.
   getAccount: (wallet: string) =>

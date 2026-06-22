@@ -330,10 +330,12 @@ export default function SwapPage() {
 
           <button
             onClick={() => handleSwap()}
-            disabled={swapping || !quote || !selectedBankId || quoteLoading}
+            disabled={swapping || !quote || !selectedBankId || quoteLoading || (session.onboarded && !session.wallet)}
             className="w-full font-semibold px-6 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {swapping ? "Executing Swap..." : (quote?.requireBvn && !session.bvnVerified ? "Verify Identity to Swap" : "Swap Now")}
+            {swapping ? "Executing Swap..." : 
+             (session.onboarded && !session.wallet) ? "Connecting Wallet..." : 
+             (quote?.requireBvn && !session.bvnVerified ? "Verify Identity to Swap" : "Swap Now")}
           </button>
         </motion.div>
       </div>

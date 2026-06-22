@@ -33,21 +33,46 @@ export default function OnboardingPage() {
     setErrorMessage(null);
     setStage("deploying");
     try {
-      const wallet = await makeWallet();
-      const res = await wallet.createWallet("ShieldPass", email);
-      await submitSigned(res.signedDeployXdr);
-      
-      // Hit link-wallet to get the Tier 1 leaf
-      const linkRes = await api.linkWallet({ email, pin, smartWalletAddress: res.contractId, passkeyKeyId: res.keyId });
+      let check;
+      try {
+        check = await api.verifyPin({ email, pin });
+      } catch (e: any) {
+        if (e.message && e.message.includes("No user")) check = null;
+        else throw e;
+      }
+
+      if (check && !check.ok) {
+        throw new Error("Incorrect PIN for existing account.");
+      }
+
+      let wallet, keyId, address, secretSalt, merkleRoot, bvnVerified = false;
+
+      if (check?.ok && check.passkeyKeyId && check.smartWalletAddress) {
+        // --- LOGIN FLOW ---
+        wallet = await makeWallet();
+        await wallet.connectWallet(check.passkeyKeyId); // Prompts Face ID / Touch ID
+        
+        const reissue = await api.reissueSalt({ email, pin });
+        keyId = check.passkeyKeyId;
+        address = check.smartWalletAddress;
+        secretSalt = reissue.secretSalt;
+        merkleRoot = reissue.merkleRoot;
+        bvnVerified = reissue.bvnVerified;
+      } else {
+        // --- SIGNUP FLOW ---
+        wallet = await makeWallet();
+        const res = await wallet.createWallet("ShieldPass", email);
+        await submitSigned(res.signedDeployXdr);
+        
+        const linkRes = await api.linkWallet({ email, pin, smartWalletAddress: res.contractId, passkeyKeyId: res.keyId });
+        keyId = res.keyId;
+        address = res.contractId;
+        secretSalt = linkRes.secretSalt;
+        merkleRoot = linkRes.merkleRoot;
+      }
       
       session.set({ 
-        wallet, 
-        keyId: res.keyId, 
-        address: res.contractId,
-        email,
-        secretSalt: linkRes.secretSalt,
-        merkleRoot: linkRes.merkleRoot,
-        bvnVerified: false
+        wallet, keyId, address, email, secretSalt, merkleRoot, bvnVerified
       });
       setStage("done");
     } catch (err) {
@@ -88,7 +113,7 @@ export default function OnboardingPage() {
             <p className="text-white/70 text-sm">Secure your account with Face ID / fingerprint. Your wallet deploys silently — gasless.</p>
             <p className="text-white/40 text-xs">No fingerprint or Face ID? Use your Windows Hello PIN, or scan the prompt's QR with your phone.</p>
             <button className={stage === "deploying" ? btnDisabled : btnPrimary} disabled={stage === "deploying"} onClick={createPasskey}>
-              {stage === "deploying" ? "Creating passkey & deploying wallet…" : "Create Passkey"}
+              {stage === "deploying" ? "Authenticating…" : "Secure Account"}
             </button>
           </motion.div>
         )}
