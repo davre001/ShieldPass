@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
 import WalletConnectButton from "../components/WalletConnectButton";
+import ErrorNotice from "../components/ErrorNotice";
 import type { Balance, HistoryItem } from "../types";
 
 const RPC_URL = "https://soroban-testnet.stellar.org";
@@ -32,12 +33,12 @@ export default function DashboardPage() {
 
   const [balances, setBalances] = useState<Balance[]>([]);
   const [balancesLoading, setBalancesLoading] = useState(false);
-  const [balancesError, setBalancesError] = useState<string | null>(null);
+  const [balancesError, setBalancesError] = useState<unknown>(null);
 
   const [active, setActive] = useState<HistoryItem[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<unknown>(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -58,7 +59,7 @@ export default function DashboardPage() {
         }
         setBalances(out);
       } catch (err) {
-        setBalancesError(err instanceof Error ? err.message : "Failed to load balances");
+        setBalancesError(err);
       } finally {
         setBalancesLoading(false);
       }
@@ -73,7 +74,7 @@ export default function DashboardPage() {
     setHistoryError(null);
     api.getHistory(address, undefined, page, 20)
       .then(setHistory)
-      .catch((err) => setHistoryError(err instanceof Error ? err.message : "Failed to load trade history"))
+      .catch((err) => setHistoryError(err))
       .finally(() => setHistoryLoading(false));
   }, [address, page]);
 
@@ -121,7 +122,7 @@ export default function DashboardPage() {
                 On-Chain Vault Balances
               </h2>
               {balancesLoading && <div className="flex items-center gap-3 opacity-60 text-sm border border-white/5 bg-white/[0.01] p-6 rounded-2xl">Reading token contracts…</div>}
-              {balancesError && <p className="text-red-400 text-sm border border-red-500/20 bg-red-500/[0.02] p-6 rounded-2xl">{balancesError}</p>}
+              {balancesError ? <ErrorNotice error={balancesError} className="border border-red-500/20 bg-red-500/[0.02] p-6 rounded-2xl" /> : null}
               {!balancesLoading && !balancesError && (
                 <div className="grid sm:grid-cols-2 gap-5">
                   {balances.length === 0 ? (
@@ -170,7 +171,7 @@ export default function DashboardPage() {
                 Escrow Settlement Ledger
               </h2>
               {historyLoading && <div className="flex items-center gap-3 opacity-60 text-sm border border-white/5 bg-white/[0.01] p-6 rounded-2xl">Loading trade history…</div>}
-              {historyError && <p className="text-red-400 text-sm border border-red-500/20 bg-red-500/[0.02] p-6 rounded-2xl">{historyError}</p>}
+              {historyError ? <ErrorNotice error={historyError} className="border border-red-500/20 bg-red-500/[0.02] p-6 rounded-2xl" /> : null}
               {!historyLoading && !historyError && history.length === 0 && (
                 <div className="glass-panel rounded-2xl p-10 text-center border border-white/5 shadow-md"><p className="text-white/50 text-sm">No trades yet. Your settlements will appear here.</p></div>
               )}

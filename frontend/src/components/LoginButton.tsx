@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSession } from "../lib/session";
 import { makeWallet } from "../lib/passkey";
 import { api } from "../lib/api";
+import { humanizeError } from "@shieldpass/sdk/dist/errors";
 
 /**
  * "Log in" for returning users.
@@ -51,7 +52,7 @@ export default function LoginButton({ className }: { className?: string }) {
       navigate("/dashboard");
     } catch (err) {
       console.error("Login failed:", err);
-      alert(err instanceof Error ? err.message : "Login failed.");
+      alert(humanizeError(err).title);
     } finally {
       setBusy(false);
     }

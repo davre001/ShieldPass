@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from './api'
 import type { Trade } from '../types'
+import { humanizeError } from '@shieldpass/sdk/dist/errors'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const TERMINAL = ['SETTLED', 'CANCELLED', 'DISPUTED']
@@ -15,7 +16,7 @@ export function useTradeStatus(tradeId: string | null, wallet: string | null) {
     let closed = false
     let es: EventSource | null = null
 
-    api.getTrade(tradeId).then((t) => { if (!closed) setTrade(t) }).catch((e) => { if (!closed) setError(e.message) })
+    api.getTrade(tradeId).then((t) => { if (!closed) setTrade(t) }).catch((e) => { if (!closed) setError(humanizeError(e).title) })
 
     if (wallet) {
       es = new EventSource(`${API_URL}/p2p/trades/live?wallet=${encodeURIComponent(wallet)}`)

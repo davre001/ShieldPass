@@ -172,6 +172,49 @@ export class StellarContractClient {
     }
 
     /**
+     * Funds a wallet by transferring a Stellar Asset Contract (SAC) token from a source account
+     * to `to`. Used to seed brand-new passkey smart wallets (C-addresses) with test tokens from the
+     * relayer — friendbot can't fund contract addresses, so tokens must be moved in via the SAC.
+     * Signed by `sourceKeypair` (a funded classic G-account that holds the token, e.g. the relayer).
+     * Returns the submitted tx hash.
+     */
+    async fundWallet(tokenId: string, to: string, amount: bigint, sourceKeypair: Keypair): Promise<string> {
+        if (!isValidSorobanAddress(tokenId)) {
+            throw new Error('[StellarContractClient] Invalid token contract address.');
+        }
+        if (!isValidSorobanAddress(to)) {
+            throw new Error('[StellarContractClient] Invalid destination wallet address.');
+        }
+        if (amount <= 0n) {
+            throw new Error('[StellarContractClient] Funding amount must be greater than zero.');
+        }
+
+        const contract = new Contract(tokenId);
+        const accountInfo = await this.server.getAccount(sourceKeypair.publicKey());
+        const account = new Account(sourceKeypair.publicKey(), accountInfo.sequenceNumber());
+
+        let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
+            .addOperation(contract.call(
+                'transfer',
+                nativeToScVal(sourceKeypair.publicKey(), { type: 'address' }),
+                nativeToScVal(to, { type: 'address' }),
+                nativeToScVal(amount, { type: 'i128' }),
+            ))
+            .setTimeout(30)
+            .build();
+
+        const sim = await this.server.simulateTransaction(tx);
+        if (!rpc.Api.isSimulationSuccess(sim)) {
+            throw new Error(`[StellarContractClient] fundWallet simulation failed: ${JSON.stringify(sim)}`);
+        }
+        tx = rpc.assembleTransaction(tx, sim).build();
+        tx.sign(sourceKeypair);
+        const sent = await this.server.sendTransaction(tx);
+        console.log(`[StellarContractClient] fundWallet submitted! Hash: ${sent.hash}`);
+        return sent.hash;
+    }
+
+    /**
      * Releases escrowed crypto to the buyer. MUST be signed by the platform arbiter
      * keypair (the contract now enforces arbiter auth, not seller auth).
      */

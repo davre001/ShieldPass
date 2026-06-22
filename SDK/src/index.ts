@@ -1,4 +1,5 @@
 export * from './types';
+export * from './errors';
 export * from './poseidon';
 export * from './utils';
 export * from './issuer';

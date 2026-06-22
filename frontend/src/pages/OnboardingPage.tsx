@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
 import { makeWallet, submitSigned } from "../lib/passkey";
+import { humanizeError } from "@shieldpass/sdk/dist/errors";
 
 type Stage = "info" | "verifying" | "confirm" | "passkey" | "deploying" | "done" | "error";
 
@@ -42,7 +43,7 @@ export default function OnboardingPage() {
       setStage("confirm");
     } catch (err) {
       setStage("error");
-      setErrorMessage(err instanceof Error ? err.message : "Verification failed.");
+      setErrorMessage(humanizeError(err).title);
     }
   }
 
@@ -58,7 +59,7 @@ export default function OnboardingPage() {
       setStage("done");
     } catch (err) {
       setStage("error");
-      setErrorMessage(err instanceof Error ? err.message : "Passkey/wallet creation failed.");
+      setErrorMessage(humanizeError(err).title);
     }
   }
 

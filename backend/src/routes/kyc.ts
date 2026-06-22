@@ -3,6 +3,7 @@ import { TrustedIssuer, isValidSorobanAddress } from '@shieldpass/sdk';
 import { prisma } from '../db';
 import { verifyBvn } from '../services/bvn';
 import { hashPin, verifyPin } from '../services/pin';
+import { seedWalletFromEnv, type SeedResult } from '../services/seed';
 
 const router = Router();
 const issuer = new TrustedIssuer();
@@ -120,7 +121,17 @@ router.post('/link-wallet', async (req, res) => {
       where: { id: user.id },
       data: { smartWalletAddress, passkeyKeyId: passkeyKeyId ?? null },
     });
-    return res.json({ success: true });
+
+    // Seed the brand-new smart wallet with test tokens from the relayer so the user can trade
+    // immediately (friendbot can't fund contract addresses). Best-effort — never blocks linking.
+    let seeded: SeedResult[] = [];
+    try {
+      seeded = await seedWalletFromEnv(smartWalletAddress);
+      if (seeded.length) console.log(`[kyc/link-wallet] seeded ${smartWalletAddress}:`, seeded);
+    } catch (seedErr) {
+      console.error('[kyc/link-wallet] seeding failed (non-fatal):', seedErr);
+    }
+    return res.json({ success: true, seeded });
   } catch (err) {
     // e.g. the smartWalletAddress unique constraint (already linked to another account).
     console.error('[kyc/link-wallet]', err);

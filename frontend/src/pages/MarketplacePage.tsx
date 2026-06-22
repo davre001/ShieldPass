@@ -6,6 +6,7 @@ import type { Trade } from "../types";
 import { useSession } from "../lib/session";
 import { useZkProof } from "../lib/useZkProof";
 import { submitSigned } from "../lib/passkey";
+import ErrorNotice from "../components/ErrorNotice";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30, filter: "blur(6px)", scale: 0.98 },
@@ -65,9 +66,9 @@ export default function MarketplacePage() {
   const [mode, setMode] = useState<"buy" | "sell">("buy");
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<unknown>(null);
 
   // Sell form
   const [assetType, setAssetType] = useState(SUPPORTED_ASSETS[0]?.code ?? "");
@@ -100,7 +101,7 @@ export default function MarketplacePage() {
     api
       .listTrades()
       .then((data) => setTrades(data.filter((t) => t.status === "OPEN")))
-      .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load offers"))
+      .catch((err) => setLoadError(err))
       .finally(() => setLoading(false));
   }
   useEffect(() => {
@@ -130,7 +131,7 @@ export default function MarketplacePage() {
       });
       navigate(`/trade/${trade.id}`, { state: { payTo: r.payTo, message: r.message } });
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to accept offer");
+      setActionError(err);
     } finally {
       setBusyId(null);
     }
@@ -192,7 +193,7 @@ export default function MarketplacePage() {
       setMode("buy");
       loadTrades();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to create offer");
+      setActionError(err);
     } finally {
       setSelling(false);
     }
@@ -239,16 +240,16 @@ export default function MarketplacePage() {
           </button>
         </motion.div>
 
-        {actionError && (
-          <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="border border-red-500/20 bg-red-500/[0.02] p-4 rounded-2xl mb-6 flex items-center justify-between">
-            <p className="text-red-400 text-sm font-medium">{actionError}</p>
+        {actionError ? (
+          <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="border border-red-500/20 bg-red-500/[0.02] p-4 rounded-2xl mb-6 flex items-center justify-between gap-4">
+            <ErrorNotice error={actionError} className="min-w-0" />
             {!session.onboarded && (
               <button onClick={() => navigate("/onboarding")} className="text-xs bg-red-500/20 border border-red-500/30 text-red-300 px-3 py-1.5 rounded-lg hover:bg-red-500/30 transition-all font-mono">
                 Go to Onboarding
               </button>
             )}
           </motion.div>
-        )}
+        ) : null}
 
         {/* ── SELL: create offer ── */}
         {mode === "sell" && (
@@ -377,11 +378,11 @@ export default function MarketplacePage() {
               </motion.div>
             )}
 
-            {loadError && (
+            {loadError ? (
               <motion.div variants={fadeUp} className="border border-red-500/20 bg-red-500/[0.02] p-6 rounded-2xl">
-                <p className="text-red-400 text-sm font-medium">{loadError}</p>
+                <ErrorNotice error={loadError} />
               </motion.div>
-            )}
+            ) : null}
 
             {!loading && !loadError && trades.length === 0 && (
               <motion.div variants={fadeUp} className="glass-panel p-12 rounded-[2rem] text-center">
