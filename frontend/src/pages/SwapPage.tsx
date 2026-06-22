@@ -194,7 +194,7 @@ export default function SwapPage() {
 
     try {
       setSwapping(true);
-      const pr = await zk.generateProof(session.secretSalt, session.merkleRoot, quote.requireBvn ? 1 : 0);
+      const pr = await zk.generateProof(session.secretSalt, session.merkleRoot, quote.requireBvn, session.bvnVerified);
       if (!pr) throw new Error(zk.error || "Proof generation failed.");
 
       const { StellarContractClient } = await import("@shieldpass/sdk/dist/stellar");
@@ -203,7 +203,7 @@ export default function SwapPage() {
       
       // 1. Lock on-chain
       const created = await stellar.lockSwap(
-        { user: session.address, tokenAddress: token.sac, amount: BigInt(cryptoAmount), nullifier: pr.nullifier },
+        { userWallet: session.address, tokenAddress: token.sac, amount: BigInt(cryptoAmount), nullifier: pr.nullifier },
         { kind: "passkey", sign: (xdr: string) => session.wallet!.sign(xdr, session.keyId), submit: submitSigned }
       );
 

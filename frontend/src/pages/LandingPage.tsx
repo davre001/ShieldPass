@@ -1,5 +1,5 @@
 import ScrollHero from "../components/ui/ethereal";
-import WalletConnectButton from "../components/WalletConnectButton";
+
 import LoginButton from "../components/LoginButton";
 import { Icons } from "../components/ui/icons";
 import { motion, useInView } from "motion/react";

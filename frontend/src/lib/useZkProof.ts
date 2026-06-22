@@ -26,7 +26,7 @@ export function useZkProof() {
 
   const addLog = (msg: string) => setLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`])
 
-  const generateProof = async (secretSalt: string, merkleRoot: string): Promise<ZkProofResult | null> => {
+  const generateProof = async (secretSalt: string, merkleRoot: string, requireBvn: boolean, bvnVerified: boolean): Promise<ZkProofResult | null> => {
     setStatus('loading-circuit')
     setResult(null)
     setError(null)
@@ -50,13 +50,15 @@ export function useZkProof() {
       const params = {
         secret_salt: secretSalt,
         is_human: '1',
-        bvn_verified: '1',
+        bvn_verified: bvnVerified ? '1' : '0',
         good_standing: '1',
         merkle_path: Array(DEPTH).fill('0'),
         merkle_indices: Array(DEPTH).fill('0'),
         merkle_root: merkleRoot,
         current_timestamp,
         nullifier,
+        hardware_attested: '1',
+        require_bvn: requireBvn ? '1' : '0',
       }
 
       addLog('Initializing Barretenberg + Noir...')

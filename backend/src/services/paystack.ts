@@ -1,51 +1,81 @@
-import crypto from 'crypto';
+/**
+ * Paystack — outward Naira payouts (redundancy).
+ *
+ * Implements the outbound transfer API for Paystack to act as the primary fiat
+ * payout provider. If this fails, the system falls back to Lenco.
+ */
 
-const BASE = 'https://api.paystack.co';
-function secret(): string { return process.env.PAYSTACK_SECRET_KEY || ''; }
-function authHeaders() { return { Authorization: `Bearer ${secret()}`, 'Content-Type': 'application/json' }; }
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || '';
 
-/** Verifies a Paystack webhook: HMAC-SHA512 of the raw body with the secret key. */
-export function verifyWebhook(rawBody: string, signature: string): boolean {
-  const key = secret();
-  if (!signature || !key || !rawBody) return false;
-  const hash = crypto.createHmac('sha512', key).update(rawBody).digest('hex');
-  const a = Buffer.from(hash);
-  const b = Buffer.from(signature);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+export interface FiatTransferInput {
+  amountNaira: number;
+  accountNumber: string;
+  bankName: string;
+  accountName: string;
+  bankCode?: string;
+  reference: string;
 }
 
-export interface VirtualAccount { accountNumber: string; bankName: string; reference: string; }
-
-/** Creates (or reuses) a customer, then assigns a dedicated virtual account for this trade. */
-export async function createVirtualAccount(params: { email: string; tradeId: string }): Promise<VirtualAccount> {
-  const custRes = await fetch(`${BASE}/customer`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ email: params.email }) });
-  const cust: any = await custRes.json();
-  if (!cust.status) throw new Error(`Paystack customer error: ${cust.message}`);
-
-  const daRes = await fetch(`${BASE}/dedicated_account`, {
-    method: 'POST', headers: authHeaders(),
-    body: JSON.stringify({ customer: cust.data.customer_code, preferred_bank: 'test-bank' }),
-  });
-  const da: any = await daRes.json();
-  if (!da.status) throw new Error(`Paystack dedicated_account error: ${da.message}`);
-
-  return { accountNumber: da.data.account_number, bankName: da.data.bank?.name ?? 'unknown', reference: da.data.account_number };
+export interface FiatTransferResult {
+  ok: boolean;
+  transferId: string;
+  status: 'successful' | 'pending' | 'failed';
+  error?: string;
 }
 
-/** Sends Naira to the seller: create a transfer recipient, then initiate the transfer. Returns the transfer reference. */
-export async function payoutToSeller(params: { amountKobo: number; accountNumber: string; bankCode: string; name: string }): Promise<string> {
-  const recRes = await fetch(`${BASE}/transferrecipient`, {
-    method: 'POST', headers: authHeaders(),
-    body: JSON.stringify({ type: 'nuban', name: params.name, account_number: params.accountNumber, bank_code: params.bankCode, currency: 'NGN' }),
-  });
-  const rec: any = await recRes.json();
-  if (!rec.status) throw new Error(`Paystack recipient error: ${rec.message}`);
+export async function initiatePaystackTransfer(input: FiatTransferInput): Promise<FiatTransferResult> {
+  if (!(input.amountNaira > 0)) return { ok: false, transferId: '', status: 'failed', error: 'Amount must be positive.' };
+  if (!input.accountNumber) return { ok: false, transferId: '', status: 'failed', error: 'accountNumber is required.' };
+  if (!input.bankCode) return { ok: false, transferId: '', status: 'failed', error: 'bankCode is required for Paystack transfers.' };
 
-  const trRes = await fetch(`${BASE}/transfer`, {
-    method: 'POST', headers: authHeaders(),
-    body: JSON.stringify({ source: 'balance', amount: params.amountKobo, recipient: rec.data.recipient_code, reason: 'ShieldPass P2P payout' }),
-  });
-  const tr: any = await trRes.json();
-  if (!tr.status) throw new Error(`Paystack transfer error: ${tr.message}`);
-  return tr.data.reference;
+  // Mock mode: no API key configured.
+  if (!PAYSTACK_SECRET_KEY) {
+    const transferId = `mock_paystack_${input.reference}_${Date.now()}`;
+    console.log(`[paystack] MOCK transfer ₦${input.amountNaira} -> ${input.bankName} ${input.accountNumber}`);
+    return { ok: true, transferId, status: 'successful' };
+  }
+
+  try {
+    // 1. Create a Transfer Recipient
+    const rcptRes = await fetch('https://api.paystack.co/transferrecipient', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+      body: JSON.stringify({
+        type: 'nuban',
+        name: input.accountName,
+        account_number: input.accountNumber,
+        bank_code: input.bankCode,
+        currency: 'NGN',
+      }),
+    });
+    const rcptData = await rcptRes.json();
+    if (!rcptData.status) {
+      return { ok: false, transferId: '', status: 'failed', error: rcptData.message || 'Failed to create Paystack recipient' };
+    }
+    const recipientCode = rcptData.data.recipient_code;
+
+    // 2. Initiate the Transfer
+    const trfRes = await fetch('https://api.paystack.co/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` },
+      body: JSON.stringify({
+        source: 'balance',
+        amount: input.amountNaira * 100, // Paystack expects kobo
+        recipient: recipientCode,
+        reason: `ShieldPass swap ${input.reference}`,
+        reference: input.reference,
+      }),
+    });
+    const trfData = await trfRes.json();
+    if (!trfData.status) {
+      return { ok: false, transferId: '', status: 'failed', error: trfData.message || 'Failed to initiate Paystack transfer' };
+    }
+
+    const tx = trfData.data;
+    const paystackStatus = tx.status === 'success' ? 'successful' : tx.status === 'failed' ? 'failed' : 'pending';
+    
+    return { ok: paystackStatus !== 'failed', transferId: String(tx.transfer_code || input.reference), status: paystackStatus };
+  } catch (err) {
+    return { ok: false, transferId: '', status: 'failed', error: err instanceof Error ? err.message : String(err) };
+  }
 }

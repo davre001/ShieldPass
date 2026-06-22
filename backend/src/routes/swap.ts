@@ -4,7 +4,8 @@ import { StellarContractClient } from '@shieldpass/sdk';
 import { prisma } from '../db';
 import { checkProof, burnNullifier } from '../services/compliance';
 import { getQuote, TIER2_THRESHOLD_NAIRA } from '../services/quote';
-import { initiateTransfer } from '../services/lenco';
+import { initiateTransfer as initiateLencoTransfer, type LencoTransferResult } from '../services/lenco';
+import { initiatePaystackTransfer } from '../services/paystack';
 
 const router = Router();
 
@@ -17,6 +18,14 @@ const NETWORK = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
 function fieldToBit(v: unknown): string {
   try { return BigInt(String(v)) === 1n ? '1' : '0'; } catch { return '0'; }
 }
+
+const NIGERIAN_BANKS = [
+  { code: "044", name: "Access Bank" }, { code: "050", name: "Ecobank" },
+  { code: "011", name: "First Bank" }, { code: "058", name: "GTBank" },
+  { code: "50211", name: "Kuda" }, { code: "50515", name: "Moniepoint" },
+  { code: "999992", name: "OPay" }, { code: "033", name: "UBA" },
+  { code: "057", name: "Zenith Bank" },
+];
 
 // POST /swap/quote — Naira payout for any Stellar asset + whether it needs Tier 2 (BVN).
 router.post('/quote', (req, res) => {
@@ -75,18 +84,35 @@ router.post('/execute', async (req, res) => {
     },
   });
 
-  // 3. Pay the Naira out to the user's bank account via Lenco.
-  const transfer = await initiateTransfer({
+  // 3. Pay the Naira out to the user's bank account with redundancy (Paystack -> Lenco).
+  let transfer: LencoTransferResult = await initiatePaystackTransfer({
     amountNaira: quote.nairaAmount,
     accountNumber: bank.accountNumber,
+    bankCode: NIGERIAN_BANKS.find(b => b.name === bank.bankName)?.code, // Lookup nuban
     bankName: bank.bankName,
     accountName: bank.accountName,
-    reference: swap.id,
+    reference: `ps_${swap.id}`, // Unique ref for Paystack
   });
+
+  let processorUsed = 'Paystack';
+
   if (!transfer.ok || transfer.status === 'failed') {
-    // Fiat failed — leave the crypto locked. The user can refund after the on-chain time-lock.
+    console.warn(`[swap/execute] Paystack failed: ${transfer.error}. Falling back to Lenco...`);
+    transfer = await initiateLencoTransfer({
+      amountNaira: quote.nairaAmount,
+      accountNumber: bank.accountNumber,
+      bankCode: NIGERIAN_BANKS.find(b => b.name === bank.bankName)?.code,
+      bankName: bank.bankName,
+      accountName: bank.accountName,
+      reference: `lc_${swap.id}`, // Unique ref for Lenco
+    });
+    processorUsed = 'Lenco';
+  }
+
+  if (!transfer.ok || transfer.status === 'failed') {
+    // Both fiat providers failed — leave the crypto locked. The user can refund after the on-chain time-lock.
     await prisma.swap.update({ where: { id: swap.id }, data: { status: 'REFUNDED' } });
-    return res.status(502).json({ error: `Fiat payout failed: ${transfer.error || 'unknown error'}. Your crypto stays locked and is refundable after the time-lock.` });
+    return res.status(502).json({ error: `Fiat payout failed on all providers: ${transfer.error || 'unknown error'}. Your crypto stays locked and is refundable after the time-lock.` });
   }
   await prisma.swap.update({ where: { id: swap.id }, data: { lencoTransferId: transfer.transferId } });
 
@@ -111,7 +137,7 @@ router.post('/execute', async (req, res) => {
   res.json({
     success: true,
     swap: completed,
-    payout: { amountNaira: quote.nairaAmount, bank: `${bank.bankName} ${bank.accountNumber}`, transferId: transfer.transferId },
+    payout: { amountNaira: quote.nairaAmount, bank: `${bank.bankName} ${bank.accountNumber}`, transferId: transfer.transferId, processor: processorUsed },
     message: `₦${quote.nairaAmount.toLocaleString()} sent to ${bank.bankName} ${bank.accountNumber}.`,
   });
 });

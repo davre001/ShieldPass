@@ -5,7 +5,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import MainLayout from "./components/MainLayout";
-import { SessionProvider, useSession } from "../lib/session";
+import { SessionProvider, useSession } from "./lib/session";
 
 import LandingPage from "./pages/LandingPage";
 import OnboardingPage from "./pages/OnboardingPage";

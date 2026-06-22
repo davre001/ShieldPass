@@ -9,7 +9,7 @@ import walletRoutes from './routes/wallet';
 export const app = express();
 
 app.use(cors());
-// Capture the raw request body so the payments webhook can verify Paystack's HMAC signature.
+// Capture the raw request body so Lenco webhooks can verify HMAC signatures.
 app.use(express.json({ verify: (req, _res, buf) => { (req as any).rawBody = buf.toString('utf8'); } }));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'shieldpass-backend' }));

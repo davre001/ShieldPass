@@ -11,6 +11,7 @@ interface SessionState {
   wallet: PasskeyWalletClient | null
   keyId: string
   address: string | null // C-address smart wallet
+  bvnVerified: boolean
 }
 
 export interface Session extends SessionState {
@@ -23,6 +24,7 @@ const EMPTY: SessionState = {
   email: '', name: '', phone: '',
   secretSalt: null, merkleRoot: null,
   wallet: null, keyId: '', address: null,
+  bvnVerified: false,
 }
 
 const STORAGE_KEY = 'shieldpass_session'
