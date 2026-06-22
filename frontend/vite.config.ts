@@ -17,7 +17,13 @@ const bbBrowser = path.resolve(
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: { '@aztec/bb.js': bbBrowser },
+    alias: [
+      { find: '@aztec/bb.js', replacement: bbBrowser },
+      {
+        find: /^@shieldpass\/sdk\/dist\/(.+)$/,
+        replacement: path.resolve(import.meta.dirname, '../sdk/src/$1.ts'),
+      },
+    ],
     dedupe: ['@aztec/bb.js'],
   },
   // Cross-origin isolation so barretenberg (bb.js) can use SharedArrayBuffer for in-browser ZK
