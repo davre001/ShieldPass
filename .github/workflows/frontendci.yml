@@ -1,0 +1,45 @@
+name: Frontend CI
+
+# Build gate for the frontend. Deployment itself is handled natively by Vercel
+# (it watches the fork's main branch and auto-deploys on push) — this workflow
+# only verifies the production build succeeds.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "SDK/**"
+      - ".github/workflows/frontendci.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "SDK/**"
+      - ".github/workflows/frontendci.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # The frontend depends on the SDK via `file:../SDK`, and SDK/dist is gitignored,
+      # so the SDK must be compiled first.
+      - name: Build SDK
+        working-directory: SDK
+        run: |
+          npm ci
+          npx tsc
+          cp ../frontend/public/reusable_kyc.json dist/reusable_kyc.json
+
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build (tsc + vite)
+        working-directory: frontend
+        run: npm run build

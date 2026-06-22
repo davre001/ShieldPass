@@ -1,0 +1,51 @@
+name: Backend CI
+
+# Build + test gate for the backend. Deployment itself is handled natively by
+# Render (it watches the fork's main branch and auto-deploys on push) — this
+# workflow only verifies the code compiles and tests pass.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "SDK/**"
+      - ".github/workflows/backendci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "SDK/**"
+      - ".github/workflows/backendci.yml"
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # The backend depends on the SDK via `file:../SDK`, and SDK/dist is gitignored,
+      # so the SDK must be compiled first.
+      - name: Build SDK
+        working-directory: SDK
+        run: |
+          npm ci
+          npx tsc
+          # backend imports `@shieldpass/sdk/dist/reusable_kyc.json`. The compiled
+          # circuit is committed in the frontend; make it available to the SDK dist.
+          cp ../frontend/public/reusable_kyc.json dist/reusable_kyc.json
+
+      - name: Install backend
+        working-directory: backend
+        run: npm ci
+
+      - name: Type-check & build
+        working-directory: backend
+        run: npm run build
+
+      - name: Test
+        working-directory: backend
+        run: npm test

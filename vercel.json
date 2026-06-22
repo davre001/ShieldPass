@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd SDK && npm ci --include=dev && npx tsc && cp ../frontend/public/reusable_kyc.json dist/reusable_kyc.json && cd ../frontend && npm ci --include=dev && npm run build",
+  "installCommand": "echo 'install handled in buildCommand'",
+  "outputDirectory": "frontend/dist",
+  "framework": null,
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
