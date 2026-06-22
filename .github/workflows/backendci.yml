@@ -20,6 +20,30 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+
+    # Ephemeral Postgres for the test run — the Prisma 7 client connects via the
+    # @prisma/adapter-pg driver, so tests need a real database. This keeps CI
+    # self-contained (no external Neon credentials, no prod data mutation).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shieldpass_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Prisma reads this both at generate time (prisma.config.ts) and at runtime
+      # (the pg adapter in src/db.ts). Local Postgres → sslmode=disable.
+      NEON_CONNECTION_STRING: postgresql://postgres:postgres@localhost:5432/shieldpass_test?sslmode=disable
+
     steps:
       - uses: actions/checkout@v4
 
@@ -41,6 +65,17 @@ jobs:
       - name: Install backend
         working-directory: backend
         run: npm install --no-audit --no-fund
+
+      # Prisma 7 no longer emits the client into node_modules — it's generated into
+      # backend/src/generated/prisma (gitignored), so this MUST run before tsc.
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      # Create the schema in the ephemeral Postgres so the tests have tables.
+      - name: Push schema to test database
+        working-directory: backend
+        run: npx prisma db push
 
       - name: Type-check & build
         working-directory: backend
