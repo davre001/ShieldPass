@@ -3,9 +3,8 @@ import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
-import WalletConnectButton from "../components/WalletConnectButton";
 import ErrorNotice from "../components/ErrorNotice";
-import type { Balance, HistoryItem } from "../types";
+import type { Balance, SwapRecord } from "../types";
 
 const RPC_URL = "https://soroban-testnet.stellar.org";
 const TOKENS = [
@@ -30,16 +29,15 @@ const getAssetTheme = (assetCode: string) => {
 export default function DashboardPage() {
   const session = useSession();
   const address = session.address;
+  const email = session.email;
 
   const [balances, setBalances] = useState<Balance[]>([]);
   const [balancesLoading, setBalancesLoading] = useState(false);
   const [balancesError, setBalancesError] = useState<unknown>(null);
 
-  const [active, setActive] = useState<HistoryItem[]>([]);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [history, setHistory] = useState<SwapRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<unknown>(null);
-  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (!address) return;
@@ -64,19 +62,17 @@ export default function DashboardPage() {
         setBalancesLoading(false);
       }
     })();
-
-    api.getActive(address).then(setActive).catch(() => setActive([]));
   }, [address]);
 
   useEffect(() => {
-    if (!address) return;
+    if (!email) return;
     setHistoryLoading(true);
     setHistoryError(null);
-    api.getHistory(address, undefined, page, 20)
+    api.swapHistory(email)
       .then(setHistory)
       .catch((err) => setHistoryError(err))
       .finally(() => setHistoryLoading(false));
-  }, [address, page]);
+  }, [email]);
 
   return (
     <motion.div className="flex flex-col items-center w-full pt-4 sm:pt-6 pb-20 relative z-10" variants={stagger} initial="hidden" animate="visible">
@@ -84,10 +80,10 @@ export default function DashboardPage() {
         <motion.div variants={fadeUp} className="flex flex-col md:flex-row md:items-baseline justify-between mb-8 sm:mb-10 gap-4">
           <div>
             <h1 className="geist-heading text-3xl sm:text-4xl md:text-5xl bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent font-medium">Portfolio Dashboard</h1>
-            <p className="text-white/40 text-sm mt-2 font-light">Your passkey smart-wallet balances and zero-knowledge trade settlements.</p>
+            <p className="text-white/40 text-sm mt-2 font-light">Your smart-wallet balances and zero-knowledge swap history.</p>
           </div>
-          <Link to="/marketplace" className="px-5 py-2.5 rounded-full font-mono text-xs border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-2 group self-start md:self-auto">
-            Enter Marketplace
+          <Link to="/swap" className="px-5 py-2.5 rounded-full font-mono text-xs border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-2 group self-start md:self-auto">
+            Swap Crypto
             <svg className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
           </Link>
         </motion.div>
@@ -103,14 +99,14 @@ export default function DashboardPage() {
                 <p className="text-white/40 text-xs mt-0.5 font-mono">{address ? `${address.slice(0, 8)}…${address.slice(-6)}` : "Not connected"}</p>
               </div>
             </div>
-            <WalletConnectButton />
           </div>
         </motion.div>
 
         {!address && (
           <motion.div variants={fadeUp} className="glass-panel rounded-[2rem] p-12 text-center border border-white/5 shadow-2xl relative overflow-hidden">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-indigo-500/5 rounded-full blur-[80px]" />
-            <p className="text-white/60 text-sm max-w-sm mx-auto leading-relaxed">Onboard or connect your passkey wallet to pull live on-chain balances and your trade history.</p>
+            <p className="text-white/60 text-sm max-w-sm mx-auto leading-relaxed">Onboard to pull live on-chain balances and your swap history.</p>
+            <Link to="/onboarding" className="mt-6 inline-block font-mono text-xs px-6 py-3 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 transition-colors">Start Onboarding</Link>
           </motion.div>
         )}
 
@@ -147,49 +143,31 @@ export default function DashboardPage() {
               )}
             </motion.section>
 
-            {active.length > 0 && (
-              <motion.section variants={fadeUp}>
-                <h2 className="geist-heading text-xl sm:text-2xl mb-4 sm:mb-6 text-white font-medium">Active Trades</h2>
-                <div className="glass-panel rounded-2xl overflow-hidden divide-y divide-white/5 border border-white/5 shadow-xl">
-                  {active.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between p-4 sm:p-6 gap-4">
-                      <div className="flex items-baseline gap-4">
-                        <span className={`font-mono text-[10px] uppercase tracking-widest ${t.role === "seller" ? "text-indigo-400" : "text-purple-400"}`}>{t.role}</span>
-                        <span className="geist-heading text-lg font-light text-white">{t.cryptoAmount} <span className="text-xs text-white/50">{t.assetType}</span></span>
-                        <span className="font-mono text-sm text-white/60">₦{parseFloat(t.expectedAmount).toLocaleString()}</span>
-                      </div>
-                      <span className="font-mono text-[10px] px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-white/60">{t.status}</span>
-                    </div>
-                  ))}
-                </div>
-              </motion.section>
-            )}
-
             <motion.section variants={fadeUp}>
               <h2 className="geist-heading text-xl sm:text-2xl mb-4 sm:mb-6 flex items-center gap-3 text-white font-medium">
                 <svg className="w-5 h-5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                Escrow Settlement Ledger
+                Swap History
               </h2>
-              {historyLoading && <div className="flex items-center gap-3 opacity-60 text-sm border border-white/5 bg-white/[0.01] p-6 rounded-2xl">Loading trade history…</div>}
+              {historyLoading && <div className="flex items-center gap-3 opacity-60 text-sm border border-white/5 bg-white/[0.01] p-6 rounded-2xl">Loading swap history…</div>}
               {historyError ? <ErrorNotice error={historyError} className="border border-red-500/20 bg-red-500/[0.02] p-6 rounded-2xl" /> : null}
               {!historyLoading && !historyError && history.length === 0 && (
-                <div className="glass-panel rounded-2xl p-10 text-center border border-white/5 shadow-md"><p className="text-white/50 text-sm">No trades yet. Your settlements will appear here.</p></div>
+                <div className="glass-panel rounded-2xl p-10 text-center border border-white/5 shadow-md"><p className="text-white/50 text-sm">No swaps yet. Your settlements will appear here.</p></div>
               )}
               {!historyLoading && !historyError && history.length > 0 && (
                 <div className="glass-panel rounded-2xl overflow-hidden divide-y divide-white/5 border border-white/5 shadow-xl">
                   {history.map((t, i) => (
                     <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05, duration: 0.3 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-6 hover:bg-white/[0.02] transition-colors gap-4">
                       <div className="flex flex-col sm:flex-row items-start sm:items-baseline gap-2 sm:gap-6 w-full">
-                        <span className={`font-mono text-[10px] uppercase tracking-widest w-16 text-xs ${t.role === "seller" ? "text-indigo-400" : "text-purple-400"}`}>{t.role}</span>
+                        <span className={`font-mono text-[10px] uppercase tracking-widest w-16 text-xs text-indigo-400`}>SELL</span>
                         <div className="flex items-baseline gap-1.5">
                           <span className="geist-heading text-xl font-light text-white">{t.cryptoAmount}</span>
-                          <span className="text-xs font-semibold text-white/50">{t.assetType}</span>
+                          <span className="text-xs font-semibold text-white/50">CRYPTO</span>
                         </div>
-                        <span className="font-mono text-sm text-white/60">₦{parseFloat(t.expectedAmount).toLocaleString()}</span>
+                        <span className="font-mono text-sm text-white/60">₦{t.nairaAmount.toLocaleString()}</span>
                       </div>
                       <div className="flex items-center gap-2.5">
-                        <span className={`font-mono text-[10px] px-3.5 py-1.5 rounded-full border flex items-center gap-2 ${t.status === "SETTLED" ? "text-green-400 border-green-400/20 bg-green-400/5 font-semibold" : "text-white/50 border-white/10 bg-white/5"}`}>
-                          {t.status === "SETTLED" && (
+                        <span className={`font-mono text-[10px] px-3.5 py-1.5 rounded-full border flex items-center gap-2 ${t.status.toUpperCase() === "COMPLETED" || t.status.toUpperCase() === "SUCCESS" ? "text-green-400 border-green-400/20 bg-green-400/5 font-semibold" : "text-white/50 border-white/10 bg-white/5"}`}>
+                          {(t.status.toUpperCase() === "COMPLETED" || t.status.toUpperCase() === "SUCCESS") && (
                             <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span>
                           )}
                           {t.status}
@@ -197,13 +175,6 @@ export default function DashboardPage() {
                       </div>
                     </motion.div>
                   ))}
-                </div>
-              )}
-              {!historyLoading && !historyError && (history.length > 0 || page > 1) && (
-                <div className="flex items-center justify-between mt-4">
-                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="font-mono text-xs px-4 py-2 rounded-lg border border-white/10 bg-white/5 disabled:opacity-40">← Prev</button>
-                  <span className="font-mono text-xs text-white/40">Page {page}</span>
-                  <button onClick={() => setPage((p) => p + 1)} disabled={history.length < 20} className="font-mono text-xs px-4 py-2 rounded-lg border border-white/10 bg-white/5 disabled:opacity-40">Next →</button>
                 </div>
               )}
             </motion.section>

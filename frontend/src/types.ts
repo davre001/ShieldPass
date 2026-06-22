@@ -51,3 +51,33 @@ export interface Trade {
 export interface HistoryItem extends Trade {
   role: 'buyer' | 'seller';
 }
+
+// ── Trustless Instant Swap ──
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  isDefault: boolean;
+}
+
+export interface Quote {
+  tokenAddress: string;
+  tokenLabel: string;
+  cryptoAmount: number;
+  rate: number;
+  nairaAmount: number;
+  requireBvn: boolean;
+  tier2ThresholdNaira: number;
+}
+
+export interface SwapRecord {
+  id: string;
+  tokenAddress: string;
+  cryptoAmount: number;
+  nairaAmount: number;
+  status: string;
+  swapId: string | null;
+  txHash: string | null;
+  createdAt: string;
+}

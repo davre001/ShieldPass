@@ -35,15 +35,15 @@ export function hash4(a: FieldLike, b: FieldLike, c: FieldLike, d: FieldLike): s
 
 /**
  * Reconstructs the KYC leaf commitment exactly as the circuit does:
- *   leaf = poseidon4([secret_salt, is_human, bvn_verified, good_standing])
+ *   leaf = poseidon4([secret_salt, hardware_attested, bvn_verified, good_standing])
  */
 export function computeLeaf(
     secretSalt: FieldLike,
-    isHuman: FieldLike = 1,
-    bvnVerified: FieldLike = 1,
+    hardwareAttested: FieldLike = 1,
+    bvnVerified: FieldLike = 0,
     goodStanding: FieldLike = 1,
 ): string {
-    return hash4(secretSalt, isHuman, bvnVerified, goodStanding);
+    return hash4(secretSalt, hardwareAttested, bvnVerified, goodStanding);
 }
 
 /**

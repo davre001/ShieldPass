@@ -38,3 +38,4 @@ docs
 
 # Prisma 7 generated client (regenerated at build via prisma generate)
 backend/src/generated/
+hh

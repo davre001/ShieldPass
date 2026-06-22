@@ -3,125 +3,122 @@ use soroban_sdk::{contract, contractimpl, contracttype, token, Address, BytesN, 
 
 #[contracttype]
 pub enum DataKey {
-    OfferCounter,
-    Offer(u64),
-    Arbiter,
+    Admin,
+    SwapCounter,
+    Swap(u64),
+}
+
+#[contracttype]
+#[derive(Clone, PartialEq)]
+pub enum SwapStatus {
+    Locked,
+    Completed,
+    Refunded,
 }
 
 #[contracttype]
 #[derive(Clone)]
-pub struct OfferDetails {
-    pub seller: Address,
+pub struct SwapDetails {
+    pub user: Address,
     pub token_address: Address,
-    pub crypto_amount: i128,
-    pub nullifier: BytesN<32>, // ZK proof nullifier - stored to prevent double-spend
-    pub is_active: bool,
+    pub amount: i128,
+    pub nullifier: BytesN<32>, // ZK proof nullifier
+    pub locked_at: u64,
+    pub status: SwapStatus,
 }
 
 #[contract]
-pub struct P2PEscrow;
+pub struct TrustlessSwap;
 
 #[contractimpl]
-impl P2PEscrow {
-    /// Initialize the escrow contract with the platform arbiter address.
-    /// The arbiter (the relayer/backend) is the only party allowed to release crypto,
-    /// because the platform holds the buyer's Naira in escrow off-chain.
-    pub fn init(env: Env, arbiter: Address) {
-        env.storage().instance().set(&DataKey::OfferCounter, &0u64);
-        env.storage().instance().set(&DataKey::Arbiter, &arbiter);
+impl TrustlessSwap {
+    /// Initialize the contract with the platform admin (treasury/relayer) address.
+    pub fn init(env: Env, admin: Address) {
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::SwapCounter, &0u64);
     }
 
-    /// Step 1: Seller creates an offer and locks crypto in the escrow.
-    /// The backend Relayer verifies the ZK Proof BEFORE calling this function.
-    /// The nullifier is stored on-chain to prevent double-spending the same KYC proof.
-    pub fn create_offer(
+    /// Step 1: User locks their crypto in the contract.
+    /// This triggers the backend to verify the ZK Proof and send the Lenco fiat payout.
+    pub fn lock_swap(
         env: Env,
-        seller: Address,
+        user: Address,
         token_address: Address,
         amount: i128,
         nullifier: BytesN<32>,
     ) -> u64 {
-        seller.require_auth();
+        user.require_auth();
 
-        // Transfer crypto from seller to Escrow Contract
+        // Transfer crypto from user to this contract
         let client = token::Client::new(&env, &token_address);
-        client.transfer(&seller, &env.current_contract_address(), &amount);
+        client.transfer(&user, &env.current_contract_address(), &amount);
 
-        // Store Offer Details (including nullifier as proof of KYC compliance)
-        let mut counter: u64 = env.storage().instance().get(&DataKey::OfferCounter).unwrap_or(0);
+        // Store Swap Details
+        let mut counter: u64 = env.storage().instance().get(&DataKey::SwapCounter).unwrap_or(0);
         counter += 1;
-        env.storage().instance().set(&DataKey::OfferCounter, &counter);
+        env.storage().instance().set(&DataKey::SwapCounter, &counter);
 
-        let details = OfferDetails {
-            seller,
+        let details = SwapDetails {
+            user,
             token_address,
-            crypto_amount: amount,
+            amount,
             nullifier,
-            is_active: true,
+            locked_at: env.ledger().timestamp(),
+            status: SwapStatus::Locked,
         };
-        env.storage().persistent().set(&DataKey::Offer(counter), &details);
+        env.storage().persistent().set(&DataKey::Swap(counter), &details);
 
         counter
     }
 
-    /// Step 2: Seller confirms they received the Naira and releases the crypto to the Buyer.
-    pub fn release_crypto(
-        env: Env,
-        offer_id: u64,
-        buyer: Address,
-    ) {
-        let arbiter: Address = env.storage().instance().get(&DataKey::Arbiter).unwrap();
-        arbiter.require_auth();
+    /// Step 2: Backend calls this ONLY AFTER the Lenco fiat payout succeeds.
+    /// It transfers the crypto to the ShieldPass treasury.
+    pub fn claim_swap(env: Env, swap_id: u64) {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        admin.require_auth();
 
-        let key = DataKey::Offer(offer_id);
-        let mut offer: OfferDetails = env.storage().persistent().get(&key).unwrap();
+        let key = DataKey::Swap(swap_id);
+        let mut swap: SwapDetails = env.storage().persistent().get(&key).unwrap();
 
-        if !offer.is_active {
-            panic!("Offer is no longer active");
+        if swap.status != SwapStatus::Locked {
+            panic!("Swap is not locked");
         }
 
-        // Mark offer as completed
-        offer.is_active = false;
-        env.storage().persistent().set(&key, &offer);
+        swap.status = SwapStatus::Completed;
+        env.storage().persistent().set(&key, &swap);
 
-        // Transfer crypto to Buyer
-        let client = token::Client::new(&env, &offer.token_address);
-        client.transfer(&env.current_contract_address(), &buyer, &offer.crypto_amount);
+        // Transfer crypto to Treasury
+        let client = token::Client::new(&env, &swap.token_address);
+        client.transfer(&env.current_contract_address(), &admin, &swap.amount);
     }
 
-    /// Step 3: Seller cancels the offer and reclaims their crypto.
-    pub fn cancel_offer(
-        env: Env,
-        offer_id: u64,
-    ) {
-        let key = DataKey::Offer(offer_id);
-        let mut offer: OfferDetails = env.storage().persistent().get(&key).unwrap();
+    /// Fallback: If the backend fails to pay the fiat within 1 hour,
+    /// the user can call this to retrieve their crypto trustlessly.
+    pub fn refund_swap(env: Env, swap_id: u64) {
+        let key = DataKey::Swap(swap_id);
+        let mut swap: SwapDetails = env.storage().persistent().get(&key).unwrap();
 
-        offer.seller.require_auth();
+        swap.user.require_auth();
 
-        if !offer.is_active {
-            panic!("Offer is no longer active");
+        if swap.status != SwapStatus::Locked {
+            panic!("Swap is not locked");
         }
 
-        // Mark offer as canceled
-        offer.is_active = false;
-        env.storage().persistent().set(&key, &offer);
+        // Check time-lock: 1 hour (3600 seconds)
+        if env.ledger().timestamp() < swap.locked_at + 3600 {
+            panic!("Time-lock has not expired yet");
+        }
 
-        // Return crypto to Seller
-        let client = token::Client::new(&env, &offer.token_address);
-        client.transfer(&env.current_contract_address(), &offer.seller, &offer.crypto_amount);
+        swap.status = SwapStatus::Refunded;
+        env.storage().persistent().set(&key, &swap);
+
+        // Return crypto to User
+        let client = token::Client::new(&env, &swap.token_address);
+        client.transfer(&env.current_contract_address(), &swap.user, &swap.amount);
     }
 
-    /// View an offer's details
-    pub fn get_offer(env: Env, offer_id: u64) -> OfferDetails {
-        env.storage().persistent().get(&DataKey::Offer(offer_id)).unwrap()
-    }
-
-    /// View total offer count
-    pub fn get_offer_count(env: Env) -> u64 {
-        env.storage().instance().get(&DataKey::OfferCounter).unwrap_or(0)
+    /// View a swap's details
+    pub fn get_swap(env: Env, swap_id: u64) -> SwapDetails {
+        env.storage().persistent().get(&DataKey::Swap(swap_id)).unwrap()
     }
 }
-
-#[cfg(test)]
-mod test;

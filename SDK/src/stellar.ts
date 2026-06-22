@@ -1,5 +1,5 @@
 import { rpc, Contract, Keypair, Networks, TransactionBuilder, Account, BASE_FEE, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
-import { CreateOfferParams, Signer } from './types';
+import { CreateOfferParams, LockSwapParams, Signer } from './types';
 import { isValidSorobanAddress } from './utils';
 
 // Validates a Stellar public key (G... address, 56 chars)
@@ -252,5 +252,135 @@ export class StellarContractClient {
         const sendResponse = await this.server.sendTransaction(tx);
         console.log(`[StellarContractClient] release_crypto submitted! Hash: ${sendResponse.hash}`);
         return sendResponse.hash;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Trustless Instant Swap (HTLC-style time-locked off-ramp)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * One-time setup of the Trustless Swap contract: `admin` (backend, the only party allowed
+     * to claim after a fiat payout) and `treasury` (where claimed crypto is swept).
+     */
+    async initSwap(adminAddress: string, treasuryAddress: string, signerKeypair: Keypair): Promise<string> {
+        if (!isValidStellarAddress(adminAddress)) throw new Error('[StellarContractClient] Invalid admin address.');
+        if (!isValidStellarAddress(treasuryAddress)) throw new Error('[StellarContractClient] Invalid treasury address.');
+
+        const contract = new Contract(this.contractId);
+        const accountInfo = await this.server.getAccount(signerKeypair.publicKey());
+        const account = new Account(signerKeypair.publicKey(), accountInfo.sequenceNumber());
+
+        let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
+            .addOperation(contract.call('init',
+                nativeToScVal(adminAddress, { type: 'address' }),
+                nativeToScVal(treasuryAddress, { type: 'address' }),
+            ))
+            .setTimeout(30)
+            .build();
+
+        const sim = await this.server.simulateTransaction(tx);
+        if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[StellarContractClient] initSwap simulation failed: ${JSON.stringify(sim)}`);
+        tx = rpc.assembleTransaction(tx, sim).build();
+        tx.sign(signerKeypair);
+        const sent = await this.server.sendTransaction(tx);
+        console.log(`[StellarContractClient] initSwap submitted! Hash: ${sent.hash}`);
+        return sent.hash;
+    }
+
+    /**
+     * lock_swap: the user transfers ANY Stellar asset into the contract to start an off-ramp.
+     * Supports keypair (backend) and passkey (browser smart wallet) signing. Returns the on-chain
+     * swap id and tx hash.
+     */
+    async lockSwap(params: LockSwapParams, signer: Signer): Promise<{ hash: string; swapId: bigint }> {
+        if (!isValidSorobanAddress(params.userWallet)) throw new Error('[StellarContractClient] Invalid user wallet address.');
+        if (!isValidSorobanAddress(params.tokenAddress)) throw new Error('[StellarContractClient] Invalid token contract address.');
+        if (!params.nullifier || params.nullifier.length === 0) throw new Error('[StellarContractClient] ZK nullifier is required to lock a swap.');
+        if (params.amount <= 0n) throw new Error('[StellarContractClient] Amount must be greater than zero.');
+
+        const contract = new Contract(this.contractId);
+
+        const nullifierBytes = Buffer.alloc(32);
+        const nullifierHex = params.nullifier.replace('0x', '').padStart(64, '0').slice(0, 64);
+        Buffer.from(nullifierHex, 'hex').copy(nullifierBytes);
+
+        const op = contract.call(
+            'lock_swap',
+            nativeToScVal(params.userWallet, { type: 'address' }),
+            nativeToScVal(params.tokenAddress, { type: 'address' }),
+            nativeToScVal(params.amount, { type: 'i128' }),
+            xdr.ScVal.scvBytes(nullifierBytes),
+        );
+
+        if (signer.kind === 'keypair') {
+            const accountInfo = await this.server.getAccount(signer.keypair.publicKey());
+            const account = new Account(signer.keypair.publicKey(), accountInfo.sequenceNumber());
+            let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
+                .addOperation(op).setTimeout(30).build();
+            const sim = await this.server.simulateTransaction(tx);
+            if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[StellarContractClient] Simulation failed: ${JSON.stringify(sim)}`);
+            tx = rpc.assembleTransaction(tx, sim).build();
+            tx.sign(signer.keypair);
+            const sent = await this.server.sendTransaction(tx);
+            console.log(`[StellarContractClient] lock_swap submitted! Hash: ${sent.hash}`);
+            return { hash: sent.hash, swapId: await this.decodeU64Return(sent.hash) };
+        }
+
+        // passkey path — same pattern as createOffer: build+simulate+assemble, then the caller's
+        // WebAuthn signer authorizes the C-address and the Channels relayer submits gaslessly.
+        const account = new Account(Keypair.random().publicKey(), '0');
+        let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
+            .addOperation(op).setTimeout(30).build();
+        const sim = await this.server.simulateTransaction(tx);
+        if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[StellarContractClient] Simulation failed: ${JSON.stringify(sim)}`);
+        tx = rpc.assembleTransaction(tx, sim).build();
+        const signedXdr = await signer.sign(tx.toXDR());
+        const hash = await signer.submit(signedXdr);
+        console.log(`[StellarContractClient] lock_swap (passkey) submitted! Hash: ${hash}`);
+        return { hash, swapId: await this.decodeU64Return(hash) };
+    }
+
+    /**
+     * claim_swap: backend sweeps the locked crypto to the treasury AFTER the Lenco fiat payout
+     * succeeded. MUST be signed by the admin keypair configured in the contract.
+     */
+    async claimSwap(swapId: bigint, adminKeypair: Keypair): Promise<string> {
+        if (swapId <= 0n) throw new Error('[StellarContractClient] swapId must be a positive number.');
+
+        const contract = new Contract(this.contractId);
+        const accountInfo = await this.server.getAccount(adminKeypair.publicKey());
+        const account = new Account(adminKeypair.publicKey(), accountInfo.sequenceNumber());
+
+        let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
+            .addOperation(contract.call(
+                'claim_swap',
+                nativeToScVal(adminKeypair.publicKey(), { type: 'address' }),
+                nativeToScVal(swapId, { type: 'u64' }),
+            ))
+            .setTimeout(30)
+            .build();
+
+        const sim = await this.server.simulateTransaction(tx);
+        if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[StellarContractClient] claim_swap simulation failed: ${JSON.stringify(sim)}`);
+        tx = rpc.assembleTransaction(tx, sim).build();
+        tx.sign(adminKeypair);
+        const sent = await this.server.sendTransaction(tx);
+        console.log(`[StellarContractClient] claim_swap submitted! Hash: ${sent.hash}`);
+        return sent.hash;
+    }
+
+    /** Poll getTransaction until SUCCESS, then decode a u64 return value (a swap/offer id). */
+    private async decodeU64Return(hash: string): Promise<bigint> {
+        for (let i = 0; i < 20; i++) {
+            const r = await this.server.getTransaction(hash);
+            if (r.status === rpc.Api.GetTransactionStatus.SUCCESS && r.returnValue) {
+                return BigInt(scValToNative(r.returnValue) as number | bigint);
+            }
+            if (r.status === rpc.Api.GetTransactionStatus.FAILED) {
+                throw new Error('[StellarContractClient] lock_swap transaction failed.');
+            }
+            await new Promise((res) => setTimeout(res, 1000));
+        }
+        throw new Error('[StellarContractClient] lock_swap result not available (timed out).');
     }
 }

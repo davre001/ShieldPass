@@ -25,28 +25,34 @@ fn merkle_membership(
 
 fn main(
     secret_salt: Field,
-    is_human: Field,
+    hardware_attested: Field,
     bvn_verified: Field,
     good_standing: Field,
     merkle_path: [Field; DEPTH],
     merkle_indices: [Field; DEPTH],
     merkle_root: pub Field,
     current_timestamp: pub Field,
-    nullifier: pub Field
+    nullifier: pub Field,
+    require_bvn: pub Field
 ) {
     // 1. Reconstruct the leaf commitment from private witnesses
     let leaf = bn254::hash_4([
-        secret_salt, is_human, bvn_verified, good_standing
+        secret_salt, hardware_attested, bvn_verified, good_standing
     ]);
 
     // 2. Prove this leaf is in the published tree
     let computed_root = merkle_membership(leaf, merkle_path, merkle_indices);
     assert(computed_root == merkle_root);
 
-    // 3. Ensure compliance flags are true
-    assert(is_human == 1);
-    assert(bvn_verified == 1);
+    // 3. Ensure compliance flags are true (Progressive / Programmable Privacy)
+    //    Tier 1 (always): hardware passkey attestation + account in good standing.
+    //    Tier 2 (conditional): BVN only enforced when the relayer sets require_bvn = 1
+    //    (e.g. swaps above the 1M NGN threshold).
+    assert(hardware_attested == 1);
     assert(good_standing == 1);
+    if require_bvn == 1 {
+        assert(bvn_verified == 1);
+    }
 
     // 4. Generate the Compliance Nullifier (Reusable Pass bound to time)
     let computed_nullifier = bn254::hash_2([secret_salt, current_timestamp]);

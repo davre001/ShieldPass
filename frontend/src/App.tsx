@@ -2,126 +2,74 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
+  Navigate,
 } from "react-router-dom";
 import MainLayout from "./components/MainLayout";
-import WalletConnectButton from "./components/WalletConnectButton";
-import { SessionProvider } from "./lib/session";
+import { SessionProvider, useSession } from "../lib/session";
 
-// Import all application page views
 import LandingPage from "./pages/LandingPage";
 import OnboardingPage from "./pages/OnboardingPage";
-import MarketplacePage from "./pages/MarketplacePage";
-import TradeRoomPage from "./pages/TradeRoomPage";
+import SwapPage from "./pages/SwapPage";
 import DashboardPage from "./pages/DashboardPage";
 import AboutPage from "./pages/AboutPage";
 import DocsPage from "./pages/DocsPage";
 import NotFoundPage from "./pages/notfound";
+
+function ProfileButton() {
+  const session = useSession();
+  if (!session.onboarded) return null;
+  return (
+    <div className="font-mono text-xs border border-white/10 bg-white/5 px-4 py-2 rounded-xl text-white/70">
+      {session.email}
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <SessionProvider>
     <Router>
       <Routes>
-        {/* The Landing Page renders standalone to maintain its clean, minimal intro design */}
-        <Route 
-          path="/" 
-          element={
-            <LandingPage />
-          } 
-        />
+        <Route path="/" element={<LandingPage />} />
 
-        {/* Core application features are wrapped in your matching MainLayout shell */}
-        <Route
-          path="/onboarding"
-          element={
-            <MainLayout
-              walletComponent={
-                <WalletConnectButton />
-              }
-            >
-              <OnboardingPage />
-            </MainLayout>
-          }
-        />
+        <Route path="/onboarding" element={
+          <MainLayout walletComponent={<ProfileButton />}>
+            <OnboardingPage />
+          </MainLayout>
+        } />
 
-        <Route
-          path="/marketplace"
-          element={
-            <MainLayout
-              walletComponent={
-                <WalletConnectButton />
-              }
-            >
-              <MarketplacePage />
-            </MainLayout>
-          }
-        />
+        <Route path="/swap" element={
+          <MainLayout walletComponent={<ProfileButton />}>
+            <SwapPage />
+          </MainLayout>
+        } />
 
-        <Route
-          path="/trade/:id"
-          element={
-            <MainLayout
-              walletComponent={
-                <WalletConnectButton />
-              }
-            >
-              <TradeRoomPage />
-            </MainLayout>
-          }
-        />
+        <Route path="/dashboard" element={
+          <MainLayout walletComponent={<ProfileButton />}>
+            <DashboardPage />
+          </MainLayout>
+        } />
 
-        <Route
-          path="/dashboard"
-          element={
-            <MainLayout
-              walletComponent={
-                <WalletConnectButton />
-              }
-            >
-              <DashboardPage />
-            </MainLayout>
-          }
-        />
+        <Route path="/about" element={
+          <MainLayout walletComponent={<ProfileButton />}>
+            <AboutPage />
+          </MainLayout>
+        } />
 
-        <Route
-          path="/about"
-          element={
-            <MainLayout
-              walletComponent={
-                <WalletConnectButton />
-              }
-            >
-              <AboutPage />
-            </MainLayout>
-          }
-        />
+        <Route path="/docs" element={
+          <MainLayout walletComponent={<ProfileButton />}>
+            <DocsPage />
+          </MainLayout>
+        } />
 
-        <Route
-          path="/docs"
-          element={
-            <MainLayout
-              walletComponent={
-                <WalletConnectButton />
-              }
-            >
-              <DocsPage />
-            </MainLayout>
-          }
-        />
+        {/* Redirect old marketplace links to swap */}
+        <Route path="/marketplace" element={<Navigate to="/swap" replace />} />
 
-        {/* Fallback Catch-all Route: show a themed 404 inside the app shell */}
-        <Route
-          path="*"
-          element={
-            <MainLayout
-              walletComponent={
-                <WalletConnectButton />
-              }
-            >
-              <NotFoundPage />
-            </MainLayout>
-          }
-        />
+        <Route path="*" element={
+          <MainLayout walletComponent={<ProfileButton />}>
+            <NotFoundPage />
+          </MainLayout>
+        } />
       </Routes>
     </Router>
     </SessionProvider>

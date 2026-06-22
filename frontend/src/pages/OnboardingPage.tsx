@@ -6,7 +6,7 @@ import { useSession } from "../lib/session";
 import { makeWallet, submitSigned } from "../lib/passkey";
 import { humanizeError } from "@shieldpass/sdk/dist/errors";
 
-type Stage = "info" | "verifying" | "confirm" | "passkey" | "deploying" | "done" | "error";
+type Stage = "info" | "passkey" | "deploying" | "done" | "error";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30, filter: "blur(6px)", scale: 0.98 },
@@ -24,28 +24,10 @@ export default function OnboardingPage() {
 
   const [stage, setStage] = useState<Stage>("info");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
-  const [bvn, setBvn] = useState("");
-  const [legalName, setLegalName] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const infoValid = /\S+@\S+\.\S+/.test(email) && /^\d{4,6}$/.test(pin);
-  const bvnValid = /^\d{11}$/.test(bvn);
-
-  async function verify() {
-    setErrorMessage(null);
-    setStage("verifying");
-    try {
-      const r = await api.submitBvn({ email, phone, bvn, pin });
-      setLegalName(r.returnedName);
-      session.set({ email, phone, name: r.returnedName, secretSalt: r.secretSalt, merkleRoot: r.merkleRoot });
-      setStage("confirm");
-    } catch (err) {
-      setStage("error");
-      setErrorMessage(humanizeError(err).title);
-    }
-  }
 
   async function createPasskey() {
     setErrorMessage(null);
@@ -54,8 +36,19 @@ export default function OnboardingPage() {
       const wallet = await makeWallet();
       const res = await wallet.createWallet("ShieldPass", email);
       await submitSigned(res.signedDeployXdr);
-      await api.linkWallet({ email, smartWalletAddress: res.contractId, passkeyKeyId: res.keyId });
-      session.set({ wallet, keyId: res.keyId, address: res.contractId });
+      
+      // Hit link-wallet to get the Tier 1 leaf
+      const linkRes = await api.linkWallet({ email, pin, smartWalletAddress: res.contractId, passkeyKeyId: res.keyId });
+      
+      session.set({ 
+        wallet, 
+        keyId: res.keyId, 
+        address: res.contractId,
+        email,
+        secretSalt: linkRes.secretSalt,
+        merkleRoot: linkRes.merkleRoot,
+        bvnVerified: false
+      });
       setStage("done");
     } catch (err) {
       setStage("error");
@@ -73,44 +66,20 @@ export default function OnboardingPage() {
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none -ml-16 -mb-16" />
 
         <motion.p variants={fadeUp} className="font-mono text-xs uppercase tracking-widest text-indigo-400 mb-4 font-semibold">
-          Verification Protocol
+          Web2 Onboarding
         </motion.p>
         <motion.h1 variants={fadeUp} className="geist-heading text-3xl md:text-4xl mb-4 bg-gradient-to-r from-white via-white to-white/60 bg-clip-text text-transparent font-medium">
           {stage === "done" ? "You're live" : "Create your account"}
         </motion.h1>
         <motion.p variants={fadeUp} className="text-white/60 text-sm mb-10 leading-relaxed font-light">
-          Demo onboarding: a mock BVN check returns your legal name, then a passkey secures your
-          wallet — deployed gaslessly, no seed phrase or XLM needed.
+          No seed phrases. Secure your account with Face ID / fingerprint. Your smart wallet deploys silently.
         </motion.p>
 
         {stage === "info" && (
           <motion.div variants={fadeUp} className="space-y-5 relative z-10">
             <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-            <input className={inputCls} inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} placeholder="Phone (0812…)" />
             <input className={inputCls} inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="Create a 4-6 digit PIN" />
-            <button className={infoValid ? btnPrimary : btnDisabled} disabled={!infoValid} onClick={() => setStage("verifying")}>Continue</button>
-          </motion.div>
-        )}
-
-        {(stage === "verifying" || (stage === "error" && !legalName)) && (
-          <motion.div variants={fadeUp} className="space-y-5 relative z-10">
-            <input className={inputCls} inputMode="numeric" maxLength={11} value={bvn} onChange={(e) => setBvn(e.target.value.replace(/\D/g, ""))} placeholder="11-digit BVN" />
-            {errorMessage && <p className="text-sm text-red-400 font-medium">{errorMessage}</p>}
-            <button className={bvnValid ? btnPrimary : btnDisabled} disabled={!bvnValid} onClick={verify}>Verify BVN</button>
-          </motion.div>
-        )}
-
-        {stage === "confirm" && (
-          <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6 relative z-10">
-            <div className="border border-white/10 bg-white/[0.02] rounded-2xl p-6">
-              <p className="text-white/40 uppercase tracking-wider text-[10px] mb-2">BVN registered to</p>
-              <p className="text-2xl text-white font-medium">{legalName}</p>
-              <p className="text-white/50 text-sm mt-2">Is this you?</p>
-            </div>
-            <div className="flex gap-3">
-              <button className={btnPrimary} onClick={() => setStage("passkey")}>Yes, continue</button>
-              <button className="px-6 py-4 rounded-xl border border-white/10 text-white/60 hover:text-white transition-all" onClick={() => { setLegalName(""); setStage("verifying"); }}>Not me</button>
-            </div>
+            <button className={infoValid ? btnPrimary : btnDisabled} disabled={!infoValid} onClick={() => setStage("passkey")}>Continue</button>
           </motion.div>
         )}
 
@@ -124,7 +93,7 @@ export default function OnboardingPage() {
           </motion.div>
         )}
 
-        {stage === "error" && legalName && (
+        {stage === "error" && (
           <motion.div variants={fadeUp} className="space-y-4 relative z-10">
             <p className="text-sm text-red-400 font-medium">{errorMessage}</p>
             <button className={btnPrimary} onClick={() => setStage("passkey")}>Try again</button>
@@ -139,7 +108,7 @@ export default function OnboardingPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
               </span>
-              Verified — {legalName}
+              Account Secured
             </p>
             <dl className="space-y-4 font-mono text-xs text-white/70">
               <div>
@@ -147,8 +116,8 @@ export default function OnboardingPage() {
                 <dd className="break-all border border-white/5 bg-white/[0.01] p-3.5 rounded-lg text-white font-mono select-all">{session.address}</dd>
               </div>
             </dl>
-            <button onClick={() => navigate("/marketplace")} className="mt-8 w-full font-semibold px-6 py-4 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-500/20 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2">
-              Enter Marketplace
+            <button onClick={() => navigate("/swap")} className="mt-8 w-full font-semibold px-6 py-4 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-500/20 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2">
+              Start Swapping
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
             </button>
           </motion.div>
