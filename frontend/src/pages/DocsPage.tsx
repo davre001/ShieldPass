@@ -1,10 +1,10 @@
-import { motion } from "motion/react";
-import { DarkBackground } from "../components/ui/background-snippets";
+import { LightBackground } from "../components/ui/background-snippets";
 
 export default function DocsPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 relative z-10 pt-24">
-      <motion.h1 
+      <LightBackground />
+      <motion.h1
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
@@ -12,7 +12,7 @@ export default function DocsPage() {
       >
         Documentation
       </motion.h1>
-      <motion.p 
+      <motion.p
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.2 }}
@@ -20,7 +20,7 @@ export default function DocsPage() {
       >
         Our developer documentation, smart contract architecture, and zero-knowledge circuit schemas are currently being finalized for the testnet release.
       </motion.p>
-      
+
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

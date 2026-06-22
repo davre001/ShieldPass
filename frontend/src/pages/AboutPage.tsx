@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { LightBackground } from "../components/ui/background-snippets";
 
 export default function AboutPage() {
   const containerVariants = {
@@ -6,7 +7,7 @@ export default function AboutPage() {
     visible: { opacity: 1, transition: { staggerChildren: 0.15 } }
   };
 
-  const itemVariants = {
+  const itemVariants: any = {
     hidden: { opacity: 0, y: 12 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } }
   };
@@ -44,6 +45,7 @@ export default function AboutPage() {
 
   return (
     <div className="flex flex-col items-center justify-start min-h-[80vh] px-4 sm:px-6 relative z-10 pt-16 pb-20 w-full max-w-6xl mx-auto">
+      <LightBackground />
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -55,17 +57,17 @@ export default function AboutPage() {
             About ShieldPass
           </h1>
           <p className="text-lg md:text-xl text-white/70 max-w-3xl mx-auto font-light leading-relaxed">
-            ShieldPass is a zero-knowledge P2P trading platform built on the Stellar network. 
-            We believe that you should be able to trade crypto for fiat securely 
+            ShieldPass is a zero-knowledge P2P trading platform built on the Stellar network.
+            We believe that you should be able to trade crypto for fiat securely
             without ever exposing your personal identity or banking data on-chain.
           </p>
         </motion.div>
 
         <div className="flex flex-col gap-32">
           {sections.map((section, idx) => (
-            <motion.div 
-              variants={itemVariants} 
-              key={section.id} 
+            <motion.div
+              variants={itemVariants}
+              key={section.id}
               className={`grid gap-12 lg:grid-cols-2 lg:gap-16 items-center ${idx % 2 === 1 ? 'lg:grid-flow-col-dense' : ''}`}
             >
               <div className={idx % 2 === 1 ? 'lg:col-start-2' : ''}>
@@ -76,10 +78,10 @@ export default function AboutPage() {
               <div className={idx % 2 === 1 ? 'lg:col-start-1' : ''}>
                 <div className="w-full p-6 sm:p-8 flex flex-col justify-center items-center">
                   <div className="rounded-xl border border-white/10 bg-white/[0.03] px-8 py-12 flex flex-col items-center justify-center w-full max-w-md shadow-2xl">
-                    <img 
-                      src={section.icon} 
-                      alt={section.headline} 
-                      className="w-24 h-24 drop-shadow-xl" 
+                    <img
+                      src={section.icon}
+                      alt={section.headline}
+                      className="w-24 h-24 drop-shadow-xl"
                     />
                     <div className="mt-8 rounded-lg bg-black/40 border border-white/10 px-4 py-3 font-mono text-[11px] text-[#06ffa5] w-full text-center">
                       sys.init({'{'} {section.id} {'}'})

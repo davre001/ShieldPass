@@ -258,23 +258,23 @@ export default function SwapPage() {
           </motion.div>
         ) : null}
 
-        <motion.div variants={fadeUp} className="glass-panel rounded-2xl p-6 mb-8 space-y-6">
+        <motion.div variants={fadeUp} className="bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-2xl rounded-3xl p-6 sm:p-8 mb-8 space-y-6 font-display text-white">
           {/* Pay Amount */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center px-1">
               <span className="text-xs text-white/50 font-medium uppercase tracking-wider">You Sell</span>
             </div>
-            <div className="flex bg-white/[0.02] border border-white/10 rounded-xl p-2 focus-within:border-indigo-400/50 transition-colors">
+            <div className="flex bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-2 focus-within:border-indigo-400/50 transition-all shadow-lg">
               <input
                 type="number" min="0" inputMode="decimal"
-                className="w-full bg-transparent text-2xl px-3 outline-none text-white font-medium"
+                className="w-full bg-transparent text-2xl px-3 outline-none text-white font-medium placeholder:text-white/20"
                 value={cryptoAmount} onChange={(e) => setCryptoAmount(e.target.value)} placeholder="0.00"
               />
               <select
-                className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-white font-semibold outline-none cursor-pointer"
+                className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white font-semibold outline-none cursor-pointer hover:bg-white/20 transition-colors"
                 value={assetType} onChange={(e) => setAssetType(e.target.value)}
               >
-                {SUPPORTED_ASSETS.map((a) => <option key={a.code} value={a.code}>{a.code}</option>)}
+                {SUPPORTED_ASSETS.map((a) => <option key={a.code} value={a.code} className="bg-zinc-900">{a.code}</option>)}
               </select>
             </div>
           </div>
@@ -291,7 +291,7 @@ export default function SwapPage() {
               <span className="text-xs text-white/50 font-medium uppercase tracking-wider">You Receive</span>
               {quoteLoading && <span className="text-xs text-indigo-400 animate-pulse">Calculating...</span>}
             </div>
-            <div className="flex bg-white/[0.01] border border-white/5 rounded-xl p-4 transition-colors opacity-80">
+            <div className="flex bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 transition-all opacity-80 shadow-lg">
               <span className="w-full bg-transparent text-2xl outline-none text-white font-medium">
                 {quote ? `₦${quote.nairaAmount.toLocaleString()}` : "₦0.00"}
               </span>
@@ -306,24 +306,24 @@ export default function SwapPage() {
           <div className="pt-4 border-t border-white/5">
             <p className="text-xs text-white/50 font-medium mb-3">Send Naira To</p>
             {banks.length === 0 || showAddBank ? (
-              <div className="space-y-3 bg-white/[0.02] border border-white/10 p-4 rounded-xl">
-                <select className="w-full bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-white outline-none text-sm" value={bankCode} onChange={e => setBankCode(e.target.value)}>
-                  <option value="">Select Bank...</option>
-                  {NIGERIAN_BANKS.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+              <div className="space-y-3 bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-lg">
+                <select className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white outline-none text-sm cursor-pointer hover:bg-white/10 transition-colors" value={bankCode} onChange={e => setBankCode(e.target.value)}>
+                  <option value="" className="bg-zinc-900">Select Bank...</option>
+                  {NIGERIAN_BANKS.map(b => <option key={b.code} value={b.code} className="bg-zinc-900">{b.name}</option>)}
                 </select>
-                <input className="w-full bg-transparent border-b border-white/10 px-2 py-2 text-white outline-none text-sm placeholder:text-white/20" maxLength={10} value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, ""))} placeholder="10-digit Account Number" />
-                <input className="w-full bg-transparent border-b border-white/10 px-2 py-2 text-white outline-none text-sm placeholder:text-white/20" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Account Holder Name" />
-                <div className="flex gap-2">
+                <input className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white outline-none text-sm placeholder:text-white/20 transition-colors focus:border-indigo-500 focus:bg-white/10" maxLength={10} value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, ""))} placeholder="10-digit Account Number" />
+                <input className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white outline-none text-sm placeholder:text-white/20 transition-colors focus:border-indigo-500 focus:bg-white/10" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Account Holder Name" />
+                <div className="flex gap-2 mt-2">
                   <button onClick={handleAddBank} disabled={addingBank} className="flex-1 bg-white/10 hover:bg-white/20 text-white text-xs py-2 rounded-lg transition-all">{addingBank ? "Saving..." : "Save Bank"}</button>
-                  {banks.length > 0 && <button onClick={() => setShowAddBank(false)} className="px-4 text-white/50 hover:text-white text-xs">Cancel</button>}
+                  {banks.length > 0 && <button onClick={() => setShowAddBank(false)} className="px-4 text-white/50 hover:text-white text-xs transition-colors">Cancel</button>}
                 </div>
               </div>
             ) : (
               <div className="flex gap-2">
-                <select className="flex-1 bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-white outline-none cursor-pointer text-sm" value={selectedBankId} onChange={e => setSelectedBankId(e.target.value)}>
+                <select className="flex-1 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 text-white outline-none cursor-pointer text-sm shadow-lg hover:bg-white/10 transition-colors" value={selectedBankId} onChange={e => setSelectedBankId(e.target.value)}>
                   {banks.map(b => <option key={b.id} value={b.id} className="bg-zinc-900">{b.bankName} - {b.accountNumber}</option>)}
                 </select>
-                <button onClick={() => setShowAddBank(true)} className="px-4 bg-white/[0.02] border border-white/10 rounded-xl hover:bg-white/5 text-white/60 hover:text-white transition-all text-xl" title="Add new bank">+</button>
+                <button onClick={() => setShowAddBank(true)} className="px-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl hover:bg-white/10 text-white/60 hover:text-white transition-all text-xl shadow-lg" title="Add new bank">+</button>
               </div>
             )}
           </div>
@@ -331,7 +331,7 @@ export default function SwapPage() {
           <button
             onClick={() => handleSwap()}
             disabled={swapping || !quote || !selectedBankId || quoteLoading || (session.onboarded && !session.wallet)}
-            className="w-full font-semibold px-6 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full font-semibold px-6 py-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/30 text-white shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {swapping ? "Executing Swap..." : 
              (session.onboarded && !session.wallet) ? "Connecting Wallet..." : 
@@ -347,7 +347,7 @@ export default function SwapPage() {
             <motion.div initial={{ scale: 0.95, y: 15 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 15 }} className="w-full max-w-sm bg-[#0d1117] border border-white/10 rounded-[2rem] p-8 shadow-2xl">
               <h3 className="geist-heading text-2xl mb-2 text-white font-medium">Identity Required</h3>
               <p className="text-white/60 text-sm mb-6">Large swaps require Tier 2 Identity. Please verify your BVN once to permanently unlock high limits.</p>
-              <input type="text" maxLength={11} className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-indigo-500 mb-2 font-mono" placeholder="11-digit BVN" value={bvn} onChange={e => setBvn(e.target.value.replace(/\D/g, ""))} />
+              <input type="text" maxLength={11} className="w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-indigo-500/50 mb-2 font-mono shadow-lg transition-all placeholder:text-white/20" placeholder="11-digit BVN" value={bvn} onChange={e => setBvn(e.target.value.replace(/\D/g, ""))} />
               {bvnError && <p className="text-red-400 text-xs mb-4">{bvnError}</p>}
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setShowBvnModal(false)} className="flex-1 py-3 border border-white/10 rounded-xl text-white/60 hover:text-white transition-all">Cancel</button>

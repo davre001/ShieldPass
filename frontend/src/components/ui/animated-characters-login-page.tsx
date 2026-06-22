@@ -5,7 +5,7 @@ import { Button } from "./button";
 import { Input } from "./input";
 import { Label } from "./label";
 import { Checkbox } from "./checkbox";
-import { Eye, EyeOff, Mail, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Mail } from "lucide-react";
 // Assuming there is no cn function exported from utils in this project, I will use a simple inline replacement or import if it exists.
 // The provided template has a `cn` import but I'll use `tailwind-merge` and `clsx` directly since we have it.
 import { clsx, type ClassValue } from "clsx";
@@ -23,8 +23,8 @@ interface PupilProps {
   forceLookY?: number;
 }
 
-const Pupil = ({ 
-  size = 12, 
+const Pupil = ({
+  size = 12,
   maxDistance = 5,
   pupilColor = "black",
   forceLookX,
@@ -98,9 +98,9 @@ interface EyeBallProps {
   forceLookY?: number;
 }
 
-const EyeBall = ({ 
-  size = 48, 
-  pupilSize = 16, 
+const EyeBall = ({
+  size = 48,
+  pupilSize = 16,
   maxDistance = 10,
   eyeColor = "white",
   pupilColor = "black",
@@ -177,10 +177,10 @@ const EyeBall = ({
 };
 
 export interface AnimatedLayoutProps {
-    children: React.ReactNode;
-    showPassword?: boolean;
-    passwordLength?: number;
-    isTyping?: boolean;
+  children: React.ReactNode;
+  showPassword?: boolean;
+  passwordLength?: number;
+  isTyping?: boolean;
 }
 
 export function AnimatedLayout({ children, showPassword = false, passwordLength = 0, isTyping = false }: AnimatedLayoutProps) {
@@ -309,7 +309,7 @@ export function AnimatedLayout({ children, showPassword = false, passwordLength 
           {/* Cartoon Characters */}
           <div className="relative" style={{ width: '550px', height: '400px' }}>
             {/* Purple tall rectangle character - Back layer */}
-            <div 
+            <div
               ref={purpleRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
@@ -322,35 +322,35 @@ export function AnimatedLayout({ children, showPassword = false, passwordLength 
                 transform: (passwordLength > 0 && showPassword)
                   ? `skewX(0deg)`
                   : (isTyping || (passwordLength > 0 && !showPassword))
-                    ? `skewX(${(purplePos.bodySkew || 0) - 12}deg) translateX(40px)` 
+                    ? `skewX(${(purplePos.bodySkew || 0) - 12}deg) translateX(40px)`
                     : `skewX(${purplePos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center',
               }}
             >
               {/* Eyes */}
-              <div 
+              <div
                 className="absolute flex gap-8 transition-all duration-700 ease-in-out"
                 style={{
                   left: (passwordLength > 0 && showPassword) ? `${20}px` : isLookingAtEachOther ? `${55}px` : `${45 + purplePos.faceX}px`,
                   top: (passwordLength > 0 && showPassword) ? `${35}px` : isLookingAtEachOther ? `${65}px` : `${40 + purplePos.faceY}px`,
                 }}
               >
-                <EyeBall 
-                  size={18} 
-                  pupilSize={7} 
-                  maxDistance={5} 
-                  eyeColor="white" 
-                  pupilColor="#2D2D2D" 
+                <EyeBall
+                  size={18}
+                  pupilSize={7}
+                  maxDistance={5}
+                  eyeColor="white"
+                  pupilColor="#2D2D2D"
                   isBlinking={isPurpleBlinking}
                   forceLookX={(passwordLength > 0 && showPassword) ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
                   forceLookY={(passwordLength > 0 && showPassword) ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
                 />
-                <EyeBall 
-                  size={18} 
-                  pupilSize={7} 
-                  maxDistance={5} 
-                  eyeColor="white" 
-                  pupilColor="#2D2D2D" 
+                <EyeBall
+                  size={18}
+                  pupilSize={7}
+                  maxDistance={5}
+                  eyeColor="white"
+                  pupilColor="#2D2D2D"
                   isBlinking={isPurpleBlinking}
                   forceLookX={(passwordLength > 0 && showPassword) ? (isPurplePeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
                   forceLookY={(passwordLength > 0 && showPassword) ? (isPurplePeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined}
@@ -359,7 +359,7 @@ export function AnimatedLayout({ children, showPassword = false, passwordLength 
             </div>
 
             {/* Black tall rectangle character - Middle layer */}
-            <div 
+            <div
               ref={blackRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
@@ -374,35 +374,35 @@ export function AnimatedLayout({ children, showPassword = false, passwordLength 
                   : isLookingAtEachOther
                     ? `skewX(${(blackPos.bodySkew || 0) * 1.5 + 10}deg) translateX(20px)`
                     : (isTyping || (passwordLength > 0 && !showPassword))
-                      ? `skewX(${(blackPos.bodySkew || 0) * 1.5}deg)` 
+                      ? `skewX(${(blackPos.bodySkew || 0) * 1.5}deg)`
                       : `skewX(${blackPos.bodySkew || 0}deg)`,
                 transformOrigin: 'bottom center',
               }}
             >
               {/* Eyes */}
-              <div 
+              <div
                 className="absolute flex gap-6 transition-all duration-700 ease-in-out"
                 style={{
                   left: (passwordLength > 0 && showPassword) ? `${10}px` : isLookingAtEachOther ? `${32}px` : `${26 + blackPos.faceX}px`,
                   top: (passwordLength > 0 && showPassword) ? `${28}px` : isLookingAtEachOther ? `${12}px` : `${32 + blackPos.faceY}px`,
                 }}
               >
-                <EyeBall 
-                  size={16} 
-                  pupilSize={6} 
-                  maxDistance={4} 
-                  eyeColor="white" 
-                  pupilColor="#2D2D2D" 
+                <EyeBall
+                  size={16}
+                  pupilSize={6}
+                  maxDistance={4}
+                  eyeColor="white"
+                  pupilColor="#2D2D2D"
                   isBlinking={isBlackBlinking}
                   forceLookX={(passwordLength > 0 && showPassword) ? -4 : isLookingAtEachOther ? 0 : undefined}
                   forceLookY={(passwordLength > 0 && showPassword) ? -4 : isLookingAtEachOther ? -4 : undefined}
                 />
-                <EyeBall 
-                  size={16} 
-                  pupilSize={6} 
-                  maxDistance={4} 
-                  eyeColor="white" 
-                  pupilColor="#2D2D2D" 
+                <EyeBall
+                  size={16}
+                  pupilSize={6}
+                  maxDistance={4}
+                  eyeColor="white"
+                  pupilColor="#2D2D2D"
                   isBlinking={isBlackBlinking}
                   forceLookX={(passwordLength > 0 && showPassword) ? -4 : isLookingAtEachOther ? 0 : undefined}
                   forceLookY={(passwordLength > 0 && showPassword) ? -4 : isLookingAtEachOther ? -4 : undefined}
@@ -411,7 +411,7 @@ export function AnimatedLayout({ children, showPassword = false, passwordLength 
             </div>
 
             {/* Orange semi-circle character - Front left */}
-            <div 
+            <div
               ref={orangeRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
@@ -425,7 +425,7 @@ export function AnimatedLayout({ children, showPassword = false, passwordLength 
                 transformOrigin: 'bottom center',
               }}
             >
-              <div 
+              <div
                 className="absolute flex gap-8 transition-all duration-200 ease-out"
                 style={{
                   left: (passwordLength > 0 && showPassword) ? `${50}px` : `${82 + (orangePos.faceX || 0)}px`,
@@ -438,7 +438,7 @@ export function AnimatedLayout({ children, showPassword = false, passwordLength 
             </div>
 
             {/* Yellow tall rectangle character - Front right */}
-            <div 
+            <div
               ref={yellowRef}
               className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
@@ -452,7 +452,7 @@ export function AnimatedLayout({ children, showPassword = false, passwordLength 
                 transformOrigin: 'bottom center',
               }}
             >
-              <div 
+              <div
                 className="absolute flex gap-6 transition-all duration-200 ease-out"
                 style={{
                   left: (passwordLength > 0 && showPassword) ? `${20}px` : `${52 + (yellowPos.faceX || 0)}px`,
@@ -462,7 +462,7 @@ export function AnimatedLayout({ children, showPassword = false, passwordLength 
                 <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={(passwordLength > 0 && showPassword) ? -5 : undefined} forceLookY={(passwordLength > 0 && showPassword) ? -4 : undefined} />
                 <Pupil size={12} maxDistance={5} pupilColor="#2D2D2D" forceLookX={(passwordLength > 0 && showPassword) ? -5 : undefined} forceLookY={(passwordLength > 0 && showPassword) ? -4 : undefined} />
               </div>
-              <div 
+              <div
                 className="absolute w-20 h-[4px] bg-[#2D2D2D] rounded-full transition-all duration-200 ease-out"
                 style={{
                   left: (passwordLength > 0 && showPassword) ? `${10}px` : `${40 + (yellowPos.faceX || 0)}px`,
@@ -515,113 +515,113 @@ export function LoginPage() {
 
   return (
     <AnimatedLayout showPassword={showPassword} passwordLength={password.length} isTyping={isTyping}>
-        <div className="w-full max-w-[420px]">
-          {/* Header */}
-          <div className="text-center mb-10">
-            <h1 className="text-3xl font-bold tracking-tight mb-2">Welcome back!</h1>
-            <p className="text-muted-foreground text-sm">Please enter your details</p>
+      <div className="w-full max-w-[420px]">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-bold tracking-tight mb-2">Welcome back!</h1>
+          <p className="text-muted-foreground text-sm">Please enter your details</p>
+        </div>
+
+        {/* Login Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="anna@gmail.com"
+              value={email}
+              autoComplete="off"
+              onChange={(e) => setEmail(e.target.value)}
+              onFocus={() => setIsTyping(true)}
+              onBlur={() => setIsTyping(false)}
+              required
+              className="h-12 bg-background border-border/60 focus:border-primary"
+            />
           </div>
 
-          {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+            <div className="relative">
               <Input
-                id="email"
-                type="email"
-                placeholder="anna@gmail.com"
-                value={email}
-                autoComplete="off"
-                onChange={(e) => setEmail(e.target.value)}
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 onFocus={() => setIsTyping(true)}
                 onBlur={() => setIsTyping(false)}
                 required
-                className="h-12 bg-background border-border/60 focus:border-primary"
+                className="h-12 pr-10 bg-background border-border/60 focus:border-primary"
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => setIsTyping(true)}
-                  onBlur={() => setIsTyping(false)}
-                  required
-                  className="h-12 pr-10 bg-background border-border/60 focus:border-primary"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? (
-                    <EyeOff className="size-5" />
-                  ) : (
-                    <Eye className="size-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="remember" />
-                <Label
-                  htmlFor="remember"
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  Remember for 30 days
-                </Label>
-              </div>
-              <a
-                href="#"
-                className="text-sm text-primary hover:underline font-medium"
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
-                Forgot password?
-              </a>
+                {showPassword ? (
+                  <EyeOff className="size-5" />
+                ) : (
+                  <Eye className="size-5" />
+                )}
+              </button>
             </div>
-
-            {error && (
-              <div className="p-3 text-sm text-red-400 bg-red-950/20 border border-red-900/30 rounded-lg">
-                {error}
-              </div>
-            )}
-
-            <Button 
-              type="submit" 
-              className="w-full h-12 text-base font-medium" 
-              size="lg" 
-              disabled={isLoading}
-            >
-              {isLoading ? "Signing in..." : "Log in"}
-            </Button>
-          </form>
-
-          {/* Social Login */}
-          <div className="mt-6">
-            <Button 
-              variant="outline" 
-              className="w-full h-12 bg-background border-border/60 hover:bg-accent"
-              type="button"
-            >
-              <Mail className="mr-2 size-5" />
-              Log in with Google
-            </Button>
           </div>
 
-          {/* Sign Up Link */}
-          <div className="text-center text-sm text-muted-foreground mt-8">
-            Don't have an account?{" "}
-            <a href="#" className="text-foreground font-medium hover:underline">
-              Sign Up
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Checkbox id="remember" />
+              <Label
+                htmlFor="remember"
+                className="text-sm font-normal cursor-pointer"
+              >
+                Remember for 30 days
+              </Label>
+            </div>
+            <a
+              href="#"
+              className="text-sm text-primary hover:underline font-medium"
+            >
+              Forgot password?
             </a>
           </div>
+
+          {error && (
+            <div className="p-3 text-sm text-red-400 bg-red-950/20 border border-red-900/30 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full h-12 text-base font-medium"
+            size="lg"
+            disabled={isLoading}
+          >
+            {isLoading ? "Signing in..." : "Log in"}
+          </Button>
+        </form>
+
+        {/* Social Login */}
+        <div className="mt-6">
+          <Button
+            variant="outline"
+            className="w-full h-12 bg-background border-border/60 hover:bg-accent"
+            type="button"
+          >
+            <Mail className="mr-2 size-5" />
+            Log in with Google
+          </Button>
         </div>
+
+        {/* Sign Up Link */}
+        <div className="text-center text-sm text-muted-foreground mt-8">
+          Don't have an account?{" "}
+          <a href="#" className="text-foreground font-medium hover:underline">
+            Sign Up
+          </a>
+        </div>
+      </div>
     </AnimatedLayout>
   );
 }

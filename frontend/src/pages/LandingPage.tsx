@@ -249,13 +249,13 @@ export default function LandingPage() {
           id: "passkeys",
           headline: "Passkeys",
           subheadline: "No Seed Phrase, No Gas",
-          body: <RevealText text="Your wallet is a passkey — unlock it with Face ID, a fingerprint, or your device PIN. Every transaction is sponsored, so you never need XLM to begin." />,
+          body: <TypewriterText text="Your wallet is a passkey — unlock it with Face ID, a fingerprint, or your device PIN. Every transaction is sponsored, so you never need XLM to begin." delayStart={0.2} />,
           media: (
             <Panel label="Sign in with">
-              <Feature label="Face ID" />
-              <Feature label="Fingerprint" />
-              <Feature label="Device PIN (Windows Hello)" />
-              <Feature label="Your phone — scan the QR" />
+              <Feature label="Face ID" index={0} />
+              <Feature label="Fingerprint" index={1} />
+              <Feature label="Device PIN (Windows Hello)" index={2} />
+              <Feature label="Your phone — scan the QR" index={3} />
               <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
                 <p className="text-white/70 text-xs font-light">
                   <span className="text-[#06ffa5] font-mono">0 XLM</span> needed — fees sponsored via OpenZeppelin Channels
@@ -271,10 +271,10 @@ export default function LandingPage() {
           body: "Smart contracts lock funds until both parties confirm — no middleman ever holds your crypto, and your keys never leave your device.",
           media: (
             <Panel label="How escrow protects you">
-              <Feature label="Crypto locked in a smart contract" />
-              <Feature label="Released only on confirmed payment" />
-              <Feature label="No middleman can freeze funds" />
-              <Feature label="Your keys never leave your device" />
+              <Feature label="Crypto locked in a smart contract" index={0} />
+              <Feature label="Released only on confirmed payment" index={1} />
+              <Feature label="No middleman can freeze funds" index={2} />
+              <Feature label="Your keys never leave your device" index={3} />
             </Panel>
           ),
         },
@@ -285,20 +285,10 @@ export default function LandingPage() {
           body: "Trade between Stellar-native assets and Nigerian naira. Fiat moves through Lenco Business Banking while crypto settles on-chain.",
           media: (
             <Panel label="Supported assets">
-<<<<<<< HEAD
               <Asset sym="XLM" name="Stellar Lumens" index={0} />
               <Asset sym="USDC" name="USD Coin" index={1} />
               <Asset sym="NGNC" name="Naira stablecoin" index={2} />
-              <Asset sym="₦ NGN" name="via Paystack" index={3} className="mt-1 border-indigo-500/20 bg-indigo-500/[0.06]" />
-=======
-              <Asset sym="XLM" name="Stellar Lumens" />
-              <Asset sym="USDC" name="USD Coin" />
-              <Asset sym="NGNC" name="Naira stablecoin" />
-              <div className="mt-1 flex items-center justify-between rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] px-4 py-3">
-                <span className="font-mono text-white text-sm">₦ NGN</span>
-                <span className="text-white/40 text-xs font-light">via Lenco</span>
-              </div>
->>>>>>> 1de7bf6428721d979a345a66f8aaf96edcd16d64
+              <Asset sym="₦ NGN" name="via Lenco" index={3} className="mt-1 border-indigo-500/20 bg-indigo-500/[0.06]" />
             </Panel>
           ),
         },
@@ -361,13 +351,8 @@ export default function LandingPage() {
           body: "Once fiat payment is confirmed, the smart contract instantly releases the crypto to the treasury. Fast, secure, and private.",
           media: (
             <Panel label="Step 3 · Settle">
-<<<<<<< HEAD
-              <Feature label="Naira payment confirmed" index={0} />
-              <Feature label="Crypto released to buyer" index={1} />
-=======
-              <Feature label="Naira payout sent to bank" />
-              <Feature label="Time-lock auto-refunds if failed" />
->>>>>>> 1de7bf6428721d979a345a66f8aaf96edcd16d64
+              <Feature label="Naira payout sent to bank" index={0} />
+              <Feature label="Time-lock auto-refunds if failed" index={1} />
               <div className="mt-2 rounded-lg border border-[#06ffa5]/20 bg-[#06ffa5]/[0.05] px-4 py-3 text-center">
                 <span className="text-[#06ffa5] text-sm font-mono">✓ SWAP COMPLETE</span>
               </div>
@@ -381,17 +366,10 @@ export default function LandingPage() {
           body: "The questions every Swap user asks — answered up front.",
           media: (
             <div className="w-full p-5 sm:p-6 flex flex-col gap-3 justify-center">
-<<<<<<< HEAD
-              <Faq q="What if the buyer doesn't pay?" a="Your crypto stays locked in escrow and unpaid trades auto-cancel — nothing is released without confirmed payment." index={0} />
+              <Faq q="What if the fiat doesn't arrive?" a="Your crypto stays locked in the escrow time-lock. If the bank transfer fails, the contract refunds your crypto automatically after 1 hour." index={0} />
               <Faq q="Is ShieldPass custodial?" a="No. Funds sit in a smart contract and your passkey never leaves your device — we can't touch either." index={1} />
               <Faq q="I lost my device — can I recover?" a="A passkey is device-bound. Add a backup signer to your wallet so a lost device doesn't mean lost funds." index={2} />
               <Faq q="What does it cost?" a="Transactions are gasless — fees are sponsored, so you don't need any XLM to trade on testnet." index={3} />
-=======
-              <Faq q="What if the fiat doesn't arrive?" a="Your crypto stays locked in the escrow time-lock. If the bank transfer fails, the contract refunds your crypto automatically after 1 hour." />
-              <Faq q="Is ShieldPass custodial?" a="No. Funds sit in a smart contract and your passkey never leaves your device — we can't touch either." />
-              <Faq q="I lost my device — can I recover?" a="A passkey is device-bound. Add a backup signer to your wallet so a lost device doesn't mean lost funds." />
-              <Faq q="What does it cost?" a="Transactions are gasless — fees are sponsored, so you don't need any XLM to trade on testnet." />
->>>>>>> 1de7bf6428721d979a345a66f8aaf96edcd16d64
             </div>
           ),
         },

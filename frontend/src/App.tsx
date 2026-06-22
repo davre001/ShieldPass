@@ -28,23 +28,14 @@ function ProfileButton() {
 export default function App() {
   return (
     <SessionProvider>
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
+      <Router>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
 
-<<<<<<< HEAD
-        {/* Core application features are wrapped in your matching MainLayout shell */}
         <Route
           path="/onboarding"
           element={<OnboardingPage />}
         />
-=======
-        <Route path="/onboarding" element={
-          <MainLayout walletComponent={<ProfileButton />}>
-            <OnboardingPage />
-          </MainLayout>
-        } />
->>>>>>> 1de7bf6428721d979a345a66f8aaf96edcd16d64
 
         <Route path="/swap" element={
           <MainLayout walletComponent={<ProfileButton />}>
@@ -70,7 +61,7 @@ export default function App() {
           </MainLayout>
         } />
 
-        {/* Redirect old marketplace links to swap */}
+  {/* Redirect old marketplace links to swap */ }
         <Route path="/marketplace" element={<Navigate to="/swap" replace />} />
 
         <Route path="*" element={
@@ -78,8 +69,8 @@ export default function App() {
             <NotFoundPage />
           </MainLayout>
         } />
-      </Routes>
-    </Router>
-    </SessionProvider>
+      </Routes >
+    </Router >
+    </SessionProvider >
   );
 }
