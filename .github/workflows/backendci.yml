@@ -25,14 +25,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       # The backend depends on the SDK via `file:../SDK`, and SDK/dist is gitignored,
       # so the SDK must be compiled first.
       - name: Build SDK
         working-directory: SDK
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npx tsc
           # backend imports `@shieldpass/sdk/dist/reusable_kyc.json`. The compiled
           # circuit is committed in the frontend; make it available to the SDK dist.
@@ -40,7 +40,7 @@ jobs:
 
       - name: Install backend
         working-directory: backend
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Type-check & build
         working-directory: backend

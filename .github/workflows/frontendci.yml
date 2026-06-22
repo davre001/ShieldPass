@@ -25,20 +25,20 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       # The frontend depends on the SDK via `file:../SDK`, and SDK/dist is gitignored,
       # so the SDK must be compiled first.
       - name: Build SDK
         working-directory: SDK
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npx tsc
           cp ../frontend/public/reusable_kyc.json dist/reusable_kyc.json
 
       - name: Install frontend
         working-directory: frontend
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Build (tsc + vite)
         working-directory: frontend
