@@ -7,7 +7,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Link } from 'react-router-dom';
-import Footer from '../Footer';
+
 import { motion, AnimatePresence } from 'motion/react';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -731,8 +731,6 @@ const ScrollHero: React.FC<ScrollHeroProps> = ({
           </div>
         </section>
       ))}
-
-      <Footer />
 
       <div className={`loading-overlay ${isLoaded ? 'loaded' : ''}`}>
         <div className="loading-text">Loading</div>

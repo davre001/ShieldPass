@@ -3,13 +3,34 @@ import ScrollHero from "../components/ui/ethereal";
 import LoginButton from "../components/LoginButton";
 import { Icons } from "../components/ui/icons";
 import { motion, useInView } from "motion/react";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 
 const btnPrimary =
   "font-mono text-[10px] sm:text-xs uppercase tracking-widest px-5 py-2.5 rounded-lg font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition-colors";
 const btnGhost =
   "inline-flex items-center gap-2 font-mono text-[10px] sm:text-xs uppercase tracking-widest px-5 py-2.5 rounded-lg font-medium border border-white/15 text-white/80 hover:bg-white/5 transition-colors";
+
+function AnimatedLock() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [locked, setLocked] = useState(false);
+  
+  useEffect(() => {
+    if (isInView) {
+      const timeout = setTimeout(() => {
+        setLocked(true);
+      }, 600);
+      return () => clearTimeout(timeout);
+    }
+  }, [isInView]);
+
+  return (
+    <div ref={ref} className="text-3xl mb-1 h-[36px]">
+      {locked ? "🔒" : "🔓"}
+    </div>
+  );
+}
 
 function RevealText({ text }: { text: string }) {
   const ref = useRef(null);
@@ -78,30 +99,80 @@ function Panel({ label, children }: { label?: string; children: React.ReactNode 
   );
 }
 
-function Feature({ label }: { label: string }) {
+function Feature({ label, index = 0 }: { label: string, index?: number }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#06ffa5]/10 text-[#06ffa5] text-xs">✓</span>
-      <span className="text-white/70 text-sm font-light">{label}</span>
+      <motion.span 
+        animate={{ 
+          scale: [0, 1.2, 1, 1], 
+          opacity: [0, 1, 1, 1] 
+        }}
+        transition={{ 
+          duration: 3, 
+          repeat: Infinity, 
+          delay: index * 0.2,
+          times: [0, 0.1, 0.15, 1],
+          ease: "easeOut"
+        }}
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#06ffa5]/10 text-[#06ffa5] text-xs"
+      >
+        ✓
+      </motion.span>
+      <motion.span 
+        animate={{ 
+          y: [10, 0, 0],
+          opacity: [0, 1, 1] 
+        }}
+        transition={{ 
+          duration: 3, 
+          repeat: Infinity, 
+          delay: index * 0.2,
+          times: [0, 0.15, 1],
+          ease: "easeOut"
+        }}
+        className="text-white/70 text-sm font-light"
+      >
+        {label}
+      </motion.span>
     </div>
   );
 }
 
-function Asset({ sym, name }: { sym: string; name: string }) {
+function Asset({ sym, name, index = 0, className }: { sym: string; name: string; index?: number; className?: string }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+    <motion.div 
+      animate={{ opacity: [0, 1, 1, 1, 0] }}
+      transition={{ 
+        duration: 5, 
+        repeat: Infinity, 
+        delay: index * 0.6,
+        times: [0, 0.15, 0.2, 0.85, 1],
+        ease: "easeInOut"
+      }}
+      className={`flex items-center justify-between rounded-xl border px-4 py-3 ${className || "border-white/10 bg-white/[0.03]"}`}
+    >
       <span className="font-mono text-white text-sm">{sym}</span>
       <span className="text-white/40 text-xs font-light">{name}</span>
-    </div>
+    </motion.div>
   );
 }
 
-function Faq({ q, a }: { q: string; a: string }) {
+function Faq({ q, a, index = 0 }: { q: string; a: string; index?: number }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-5 py-4">
+    <motion.div 
+      animate={{ opacity: [0, 1, 1, 1, 0] }}
+      transition={{ 
+        duration: 5, 
+        repeat: Infinity, 
+        delay: index * 0.6,
+        times: [0, 0.15, 0.2, 0.85, 1],
+        ease: "easeInOut"
+      }}
+      className="rounded-xl border border-white/10 bg-white/[0.03] px-5 py-4"
+    >
       <p className="text-white/90 text-sm font-medium mb-1.5">{q}</p>
       <p className="text-white/50 text-xs font-light leading-relaxed">{a}</p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -137,9 +208,9 @@ export default function LandingPage() {
           ),
           media: (
             <Panel label="Zero-knowledge proof">
-              <Feature label="Human · verified" />
-              <Feature label="BVN · verified" />
-              <Feature label="Good standing · verified" />
+              <Feature label="Human · verified" index={0} />
+              <Feature label="BVN · verified" index={1} />
+              <Feature label="Good standing · verified" index={2} />
               <div className="mt-3 rounded-lg bg-black/40 border border-white/10 px-4 py-3 font-mono text-[11px] text-[#06ffa5] break-all">
                 nullifier 0x9f2c…a41e
               </div>
@@ -178,13 +249,13 @@ export default function LandingPage() {
           id: "passkeys",
           headline: "Passkeys",
           subheadline: "No Seed Phrase, No Gas",
-          body: "Your wallet is a passkey — unlock it with Face ID, a fingerprint, or your device PIN. Every transaction is sponsored, so you never need XLM to begin.",
+          body: <TypewriterText text="Your wallet is a passkey — unlock it with Face ID, a fingerprint, or your device PIN. Every transaction is sponsored, so you never need XLM to begin." delayStart={0.2} />,
           media: (
             <Panel label="Sign in with">
-              <Feature label="Face ID" />
-              <Feature label="Fingerprint" />
-              <Feature label="Device PIN (Windows Hello)" />
-              <Feature label="Your phone — scan the QR" />
+              <Feature label="Face ID" index={0} />
+              <Feature label="Fingerprint" index={1} />
+              <Feature label="Device PIN (Windows Hello)" index={2} />
+              <Feature label="Your phone — scan the QR" index={3} />
               <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
                 <p className="text-white/70 text-xs font-light">
                   <span className="text-[#06ffa5] font-mono">0 XLM</span> needed — fees sponsored via OpenZeppelin Channels
@@ -200,10 +271,10 @@ export default function LandingPage() {
           body: "Smart contracts lock funds until both parties confirm — no middleman ever holds your crypto, and your keys never leave your device.",
           media: (
             <Panel label="How escrow protects you">
-              <Feature label="Crypto locked in a smart contract" />
-              <Feature label="Released only on confirmed payment" />
-              <Feature label="No middleman can freeze funds" />
-              <Feature label="Your keys never leave your device" />
+              <Feature label="Crypto locked in a smart contract" index={0} />
+              <Feature label="Released only on confirmed payment" index={1} />
+              <Feature label="No middleman can freeze funds" index={2} />
+              <Feature label="Your keys never leave your device" index={3} />
             </Panel>
           ),
         },
@@ -214,13 +285,10 @@ export default function LandingPage() {
           body: "Trade between Stellar-native assets and Nigerian naira. Fiat moves through Lenco Business Banking while crypto settles on-chain.",
           media: (
             <Panel label="Supported assets">
-              <Asset sym="XLM" name="Stellar Lumens" />
-              <Asset sym="USDC" name="USD Coin" />
-              <Asset sym="NGNC" name="Naira stablecoin" />
-              <div className="mt-1 flex items-center justify-between rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] px-4 py-3">
-                <span className="font-mono text-white text-sm">₦ NGN</span>
-                <span className="text-white/40 text-xs font-light">via Lenco</span>
-              </div>
+              <Asset sym="XLM" name="Stellar Lumens" index={0} />
+              <Asset sym="USDC" name="USD Coin" index={1} />
+              <Asset sym="NGNC" name="Naira stablecoin" index={2} />
+              <Asset sym="₦ NGN" name="via Lenco" index={3} className="mt-1 border-indigo-500/20 bg-indigo-500/[0.06]" />
             </Panel>
           ),
         },
@@ -243,10 +311,19 @@ export default function LandingPage() {
           body: "Create a passkey wallet with Face ID, fingerprint, or your device PIN, and generate a Zero-Knowledge proof of your identity. Your actual data never leaves your device.",
           media: (
             <Panel label="Step 1 · Verify">
-              <Feature label="Create passkey wallet" />
-              <Feature label="Generate ZK identity proof" />
+              <Feature label="Create passkey wallet" index={0} />
+              <Feature label="Generate ZK identity proof" index={1} />
               <div className="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
-                <div className="h-full w-2/3 bg-[#06ffa5]/70 rounded-full" />
+                <motion.div 
+                  className="h-full bg-[#06ffa5]/70 rounded-full" 
+                  animate={{ width: ["0%", "100%", "100%"] }}
+                  transition={{ 
+                    duration: 2.5, 
+                    repeat: Infinity, 
+                    times: [0, 0.8, 1],
+                    ease: "easeInOut" 
+                  }}
+                />
               </div>
               <p className="text-white/30 text-[10px] font-mono">proving… data stays local</p>
             </Panel>
@@ -260,10 +337,10 @@ export default function LandingPage() {
           media: (
             <Panel label="Step 2 · Lock">
               <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-5 text-center">
-                <div className="text-3xl mb-1">🔒</div>
+                <AnimatedLock />
                 <p className="text-white/70 text-xs font-light">Crypto locked in escrow</p>
               </div>
-              <Feature label="Funds safe until settlement" />
+              <Feature label="Funds safe until settlement" index={0} />
             </Panel>
           ),
         },
@@ -274,8 +351,8 @@ export default function LandingPage() {
           body: "Once fiat payment is confirmed, the smart contract instantly releases the crypto to the treasury. Fast, secure, and private.",
           media: (
             <Panel label="Step 3 · Settle">
-              <Feature label="Naira payout sent to bank" />
-              <Feature label="Time-lock auto-refunds if failed" />
+              <Feature label="Naira payout sent to bank" index={0} />
+              <Feature label="Time-lock auto-refunds if failed" index={1} />
               <div className="mt-2 rounded-lg border border-[#06ffa5]/20 bg-[#06ffa5]/[0.05] px-4 py-3 text-center">
                 <span className="text-[#06ffa5] text-sm font-mono">✓ SWAP COMPLETE</span>
               </div>
@@ -289,10 +366,10 @@ export default function LandingPage() {
           body: "The questions every Swap user asks — answered up front.",
           media: (
             <div className="w-full p-5 sm:p-6 flex flex-col gap-3 justify-center">
-              <Faq q="What if the fiat doesn't arrive?" a="Your crypto stays locked in the escrow time-lock. If the bank transfer fails, the contract refunds your crypto automatically after 1 hour." />
-              <Faq q="Is ShieldPass custodial?" a="No. Funds sit in a smart contract and your passkey never leaves your device — we can't touch either." />
-              <Faq q="I lost my device — can I recover?" a="A passkey is device-bound. Add a backup signer to your wallet so a lost device doesn't mean lost funds." />
-              <Faq q="What does it cost?" a="Transactions are gasless — fees are sponsored, so you don't need any XLM to trade on testnet." />
+              <Faq q="What if the fiat doesn't arrive?" a="Your crypto stays locked in the escrow time-lock. If the bank transfer fails, the contract refunds your crypto automatically after 1 hour." index={0} />
+              <Faq q="Is ShieldPass custodial?" a="No. Funds sit in a smart contract and your passkey never leaves your device — we can't touch either." index={1} />
+              <Faq q="I lost my device — can I recover?" a="A passkey is device-bound. Add a backup signer to your wallet so a lost device doesn't mean lost funds." index={2} />
+              <Faq q="What does it cost?" a="Transactions are gasless — fees are sponsored, so you don't need any XLM to trade on testnet." index={3} />
             </div>
           ),
         },

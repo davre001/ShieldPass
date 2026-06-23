@@ -23,7 +23,7 @@ const getAssetTheme = (assetCode: string) => {
   const code = assetCode.toUpperCase();
   if (code.includes("USD")) return { bg: "bg-cyan-500/10 border-cyan-500/25", glow: "bg-cyan-500/10", text: "text-cyan-400" };
   if (code.includes("NGN")) return { bg: "bg-emerald-500/10 border-emerald-500/25", glow: "bg-emerald-500/10", text: "text-emerald-400" };
-  return { bg: "bg-indigo-500/10 border-indigo-500/25", glow: "bg-indigo-500/10", text: "text-indigo-400" };
+  return { bg: "bg-primary/10 border-primary/25", glow: "bg-primary/10", text: "text-primary" };
 };
 
 export default function DashboardPage() {
@@ -90,14 +90,14 @@ export default function DashboardPage() {
             <h1 className="geist-heading text-3xl sm:text-4xl md:text-5xl bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent font-medium">Portfolio Dashboard</h1>
             <p className="text-white/40 text-sm mt-2 font-light">Your smart-wallet balances and zero-knowledge swap history.</p>
           </div>
-          <Link to="/swap" className="px-5 py-2.5 rounded-full font-mono text-xs border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-2 group self-start md:self-auto">
+          <Link to="/swap" className="px-5 py-2.5 rounded-full font-mono text-xs border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-2 group self-start md:self-auto text-white">
             Swap Crypto
             <svg className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
           </Link>
         </motion.div>
 
         <motion.div variants={fadeUp} className="mb-12">
-          <div className="glass-panel rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6 border border-white/5 shadow-xl">
+          <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6 border border-white/10 shadow-xl">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
                 <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
@@ -124,7 +124,7 @@ export default function DashboardPage() {
         </motion.div>
 
         {!address && (
-          <motion.div variants={fadeUp} className="glass-panel rounded-[2rem] p-12 text-center border border-white/5 shadow-2xl relative overflow-hidden">
+          <motion.div variants={fadeUp} className="bg-white/5 backdrop-blur-md rounded-[2rem] p-12 text-center border border-white/10 shadow-2xl relative overflow-hidden">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-indigo-500/5 rounded-full blur-[80px]" />
             <p className="text-white/60 text-sm max-w-sm mx-auto leading-relaxed">Onboard to pull live on-chain balances and your swap history.</p>
             <Link to="/onboarding" className="mt-6 inline-block font-mono text-xs px-6 py-3 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 transition-colors">Start Onboarding</Link>
@@ -138,22 +138,22 @@ export default function DashboardPage() {
                 <svg className="w-5 h-5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                 On-Chain Vault Balances
               </h2>
-              {balancesLoading && <div className="flex items-center gap-3 opacity-60 text-sm border border-white/5 bg-white/[0.01] p-6 rounded-2xl">Reading token contracts…</div>}
+              {balancesLoading && <div className="flex items-center gap-3 text-white/50 text-sm border border-white/10 bg-white/5 p-6 rounded-2xl">Reading token contracts…</div>}
               {balancesError ? <ErrorNotice error={balancesError} className="border border-red-500/20 bg-red-500/[0.02] p-6 rounded-2xl" /> : null}
               {!balancesLoading && !balancesError && (
                 <div className="grid sm:grid-cols-2 gap-5">
                   {balances.length === 0 ? (
-                    <div className="glass-panel rounded-2xl p-8 text-center col-span-2"><p className="text-white/50 text-sm">No token balances configured. Set VITE_XLM_SAC / VITE_USDC_SAC / VITE_NGNC_SAC.</p></div>
+                    <div className="bg-white/5 backdrop-blur-md rounded-2xl p-8 text-center col-span-2 border border-white/10"><p className="text-white/50 text-sm">No token balances configured. Set VITE_XLM_SAC / VITE_USDC_SAC / VITE_NGNC_SAC.</p></div>
                   ) : (
                     balances.map((b) => {
                       const theme = getAssetTheme(b.assetCode);
                       return (
-                        <motion.div key={b.assetCode} variants={fadeUp} whileHover={{ y: -3, scale: 1.01 }} className={`glass-panel rounded-2xl p-6 sm:p-8 border ${theme.bg} relative overflow-hidden shadow-lg`}>
+                        <motion.div key={b.assetCode} variants={fadeUp} whileHover={{ y: -3, scale: 1.01 }} className={`bg-white/5 backdrop-blur-md rounded-2xl p-6 sm:p-8 border ${theme.bg} relative overflow-hidden shadow-lg`}>
                           <div className={`absolute top-0 right-0 w-36 h-36 ${theme.glow} rounded-full blur-[40px] pointer-events-none -mr-10 -mt-10`} />
-                          <p className="font-mono text-xs text-white/40 mb-3 uppercase tracking-widest font-semibold">{b.assetCode} Vault</p>
+                          <p className="font-mono text-xs text-white/50 mb-3 uppercase tracking-widest font-semibold">{b.assetCode} Vault</p>
                           <p className="geist-heading text-3xl sm:text-4xl font-light text-white">{parseFloat(b.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</p>
-                          <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
-                            <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest">SAC Balance</span>
+                          <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
+                            <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest">SAC Balance</span>
                             <span className={`w-2 h-2 rounded-full ${theme.text} bg-current animate-pulse`} />
                           </div>
                         </motion.div>
@@ -172,12 +172,12 @@ export default function DashboardPage() {
               {historyLoading && <div className="flex items-center gap-3 opacity-60 text-sm border border-white/5 bg-white/[0.01] p-6 rounded-2xl">Loading swap history…</div>}
               {historyError ? <ErrorNotice error={historyError} className="border border-red-500/20 bg-red-500/[0.02] p-6 rounded-2xl" /> : null}
               {!historyLoading && !historyError && history.length === 0 && (
-                <div className="glass-panel rounded-2xl p-10 text-center border border-white/5 shadow-md"><p className="text-white/50 text-sm">No swaps yet. Your settlements will appear here.</p></div>
+                <div className="bg-white/5 rounded-2xl p-10 text-center border border-white/5 shadow-md"><p className="text-white/50 text-sm">No swaps yet. Your settlements will appear here.</p></div>
               )}
               {!historyLoading && !historyError && history.length > 0 && (
-                <div className="glass-panel rounded-2xl overflow-hidden divide-y divide-white/5 border border-white/5 shadow-xl">
+                <div className="bg-white/5 backdrop-blur-md rounded-2xl overflow-hidden divide-y divide-white/10 border border-white/10 shadow-xl">
                   {history.map((t, i) => (
-                    <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05, duration: 0.3 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-6 hover:bg-white/[0.02] transition-colors gap-4">
+                    <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05, duration: 0.3 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-6 hover:bg-white/5 transition-colors gap-4">
                       <div className="flex flex-col sm:flex-row items-start sm:items-baseline gap-2 sm:gap-6 w-full">
                         <span className={`font-mono text-[10px] uppercase tracking-widest w-16 text-xs text-indigo-400`}>SELL</span>
                         <div className="flex items-baseline gap-1.5">

@@ -4,33 +4,120 @@
   --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
+
+@theme inline {
+  --color-card: var(--card);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --color-radius: var(--radius);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-popover: var(--popover);
+  --color-primary: var(--primary);
+  --color-sidebar: var(--sidebar);
+  --color-font-mono: var(--font-mono);
+  --color-font-sans: var(--font-sans);
+  --color-secondary: var(--secondary);
+  --color-background: var(--background);
+  --color-font-serif: var(--font-serif);
+  --color-foreground: var(--foreground);
+  --color-destructive: var(--destructive);
+  --color-shadow-blur: var(--shadow-blur);
+  --color-shadow-color: var(--shadow-color);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-shadow-spread: var(--shadow-spread);
+  --color-shadow-opacity: var(--shadow-opacity);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-card-foreground: var(--card-foreground);
+  --color-shadow-offset-x: var(--shadow-offset-x);
+  --color-shadow-offset-y: var(--shadow-offset-y);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+}
 @layer base {
   :root {
-    /* Color Palette Extracted from Logo */
-    --ink: #0c1117; /* Core application canvas background */
-    --rust: #4953c2; /* Signature electric indigo accent */
-    --paper: #f8f9fc; /* Primary readability text foreground */
-    --stone: #707a94; /* Muted mid-tone text for subtitles/meta data */
-    --hairline: rgba(248, 249, 252, 0.08); /* Minimal technical borders */
-    --verified: #05c46b; /* High-visibility green for successful ZK compliance states */
+    --card: rgba(255, 255, 255, 0.03);
+    --ring: #1da1f2;
+    --input: rgba(255, 255, 255, 0.05);
+    --muted: rgba(255, 255, 255, 0.05);
+    --accent: rgba(255, 255, 255, 0.08);
+    --border: rgba(255, 255, 255, 0.1);
+    --radius: 1.3rem;
+    --chart-1: #1e9df1;
+    --chart-2: #00b87a;
+    --chart-3: #f7b928;
+    --chart-4: #17bf63;
+    --chart-5: #e0245e;
+    --popover: rgba(255, 255, 255, 0.03);
+    --primary: #1c9cf0;
+    --sidebar: #17181c;
+    --font-mono: Menlo, monospace;
+    --font-sans: Open Sans, sans-serif;
+    --secondary: rgba(255, 255, 255, 0.1);
+    --background: #000000;
+    --font-serif: Georgia, serif;
+    --foreground: #ffffff;
+    --destructive: #f4212e;
+    --shadow-blur: 0px;
+    --shadow-color: rgba(29,161,242,0.25);
+    --sidebar-ring: #1da1f2;
+    --shadow-spread: 0px;
+    --shadow-opacity: 0;
+    --sidebar-accent: rgba(255, 255, 255, 0.08);
+    --sidebar-border: rgba(255, 255, 255, 0.1);
+    --card-foreground: #ffffff;
+    --shadow-offset-x: 0px;
+    --shadow-offset-y: 2px;
+    --sidebar-primary: #1da1f2;
+    --muted-foreground: rgba(255, 255, 255, 0.6);
+    --accent-foreground: #ffffff;
+    --popover-foreground: #ffffff;
+    --primary-foreground: #ffffff;
+    --sidebar-foreground: #ffffff;
+    --secondary-foreground: #ffffff;
+    --destructive-foreground: #ffffff;
+    --sidebar-accent-foreground: #1c9cf0;
+    --sidebar-primary-foreground: #ffffff;
+
+    /* Original generic vars needed by old code */
+    --ink: var(--background);
+    --rust: var(--primary);
+    --paper: var(--foreground);
+    --stone: var(--muted-foreground);
+    --hairline: var(--border);
+    --verified: #05c46b;
   }
 
   body {
-    background-color: var(--ink);
-    color: #fff;
-    font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
   }
 
-  /* Set standard premium defaults without breaking Tailwind's utility colors */
   h1, h2, h3, h4, h5, h6, input, button, select, textarea {
-    color: #ffffff;
+    color: var(--foreground);
   }
   
   .text-white-important {
-    color: #ffffff !important;
+    color: var(--foreground) !important;
   }
 
   /* Smooth custom crisp scrollbars for a clean dark interface */
