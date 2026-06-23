@@ -58,7 +58,20 @@ export class SmartAccountWalletClient {
 
   /** Create a passkey + deploy its smart account. Auto-submits the deploy via the relayer proxy. */
   async createWallet(app: string, user: string): Promise<ConnectedWallet> {
-    const res = await this.kit.createWallet(app, boundUserHandle(user), { autoSubmit: true });
+    const res = await this.kit.createWallet(app, boundUserHandle(user), {
+      autoSubmit: true,
+      // Pin the authenticator so every user gets the SAME passkey experience: the device's
+      // built-in platform authenticator (Windows Hello / Touch ID / Face ID — which itself
+      // falls back to the OS PIN when there's no biometric). `platform` excludes roaming
+      // authenticators, so the browser never demands an external USB security key. `required`
+      // userVerification forces the biometric/PIN gesture; `required` residentKey keeps the
+      // credential discoverable for new-device login (connectWallet discovery prompt).
+      authenticatorSelection: {
+        authenticatorAttachment: 'platform',
+        userVerification: 'required',
+        residentKey: 'required',
+      },
+    });
     if (res.submitResult && !res.submitResult.success) {
       throw new Error(res.submitResult.error || 'Smart account deploy failed.');
     }
