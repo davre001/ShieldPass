@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { GradientBackground } from "./ui/paper-design-shader-background";
 import { DarkBackground } from "./ui/background-snippets";
+import { useSession } from "../lib/session";
 
 
 interface MainLayoutProps {
@@ -17,6 +18,7 @@ export default function MainLayout({
   const location = useLocation();
   const currentPath = location.pathname;
   const isActive = (path: string) => currentPath === path;
+  const session = useSession();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -48,6 +50,7 @@ export default function MainLayout({
 
         {/* Restored Navigation Links */}
         <nav className="hidden md:flex flex-1 justify-center items-center gap-6 text-sm font-mono tracking-wider">
+          {!session.onboarded && (
           <Link
             to="/onboarding"
             className={`flex items-center gap-2 transition-all duration-300 ${isActive("/onboarding") ? "opacity-100 font-semibold" : "opacity-60 hover:opacity-100"}`}
@@ -57,6 +60,7 @@ export default function MainLayout({
             </svg>
             Verify Identity
           </Link>
+          )}
           <Link
             to="/swap"
             className={`flex items-center gap-2 transition-all duration-300 ${isActive("/swap") ? "opacity-100 font-semibold" : "opacity-60 hover:opacity-100"}`}
@@ -127,6 +131,7 @@ export default function MainLayout({
         className="fixed inset-0 z-40 bg-background/98 pt-28 px-8 flex flex-col gap-6 md:hidden"
       >
         <div className="flex flex-col gap-2 text-lg font-mono tracking-wider pt-6">
+          {!session.onboarded && (
           <Link
             to="/onboarding"
             onClick={() => setIsMobileMenuOpen(false)}
@@ -137,6 +142,7 @@ export default function MainLayout({
             </svg>
             Verify Identity
           </Link>
+          )}
           <Link
             to="/swap"
             onClick={() => setIsMobileMenuOpen(false)}

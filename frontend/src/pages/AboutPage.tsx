@@ -1,5 +1,4 @@
 import { motion } from "motion/react";
-import { LightBackground } from "../components/ui/background-snippets";
 
 export default function AboutPage() {
   const containerVariants = {
@@ -45,7 +44,6 @@ export default function AboutPage() {
 
   return (
     <div className="flex flex-col items-center justify-start min-h-[80vh] px-4 sm:px-6 relative z-10 pt-16 pb-20 w-full max-w-6xl mx-auto">
-      <LightBackground />
       <motion.div
         variants={containerVariants}
         initial="hidden"
