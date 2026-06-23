@@ -82,8 +82,10 @@ export default function OnboardingPage() {
       });
       setStage("done");
     } catch (err) {
+      console.error("[onboarding] createPasskey failed:", err, humanizeError(err).detail);
       setStage("error");
-      setErrorMessage(humanizeError(err).title);
+      const { title, detail } = humanizeError(err);
+      setErrorMessage(import.meta.env.DEV && detail ? `${title}\n\n${detail}` : title);
     }
   }
 
@@ -130,7 +132,7 @@ export default function OnboardingPage() {
 
           {stage === "error" && (
             <motion.div variants={fadeUp} className="space-y-4 relative z-10">
-              <p className="text-sm text-red-400 font-medium">{errorMessage}</p>
+              <p className="text-sm text-red-400 font-medium whitespace-pre-wrap break-words">{errorMessage}</p>
               <button className={btnPrimary} onClick={() => setStage("passkey")}>Try again</button>
             </motion.div>
           )}
