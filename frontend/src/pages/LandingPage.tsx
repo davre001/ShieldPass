@@ -208,9 +208,9 @@ export default function LandingPage() {
           ),
           media: (
             <Panel label="Zero-knowledge proof">
-              <Feature label="Human · verified" index={0} />
-              <Feature label="BVN · verified" index={1} />
-              <Feature label="Good standing · verified" index={2} />
+              <Feature label="Passkey · attested" index={0} />
+              <Feature label="Good standing · verified" index={1} />
+              <Feature label="BVN · large swaps only" index={2} />
               <div className="mt-3 rounded-lg bg-black/40 border border-white/10 px-4 py-3 font-mono text-[11px] text-[#06ffa5] break-all">
                 nullifier 0x9f2c…a41e
               </div>
@@ -224,7 +224,7 @@ export default function LandingPage() {
           subheadline: <RevealText text="By Default" />,
           body: (
             <span>
-              <SlowFadeText text="Your BVN and" />
+              <SlowFadeText text="Your identity and" />
               <TypewriterText
                 text="personal data never leave your device. Only cryptographic proofs travel on-chain."
                 delayStart={1.5}
@@ -235,7 +235,7 @@ export default function LandingPage() {
             <Panel label="Where your data lives">
               <div className="rounded-xl border border-[#06ffa5]/20 bg-[#06ffa5]/[0.04] px-4 py-3">
                 <p className="text-[#06ffa5] text-[11px] font-mono mb-1">ON YOUR DEVICE</p>
-                <p className="text-white/60 text-xs font-light">BVN · name · bank details · secret salt</p>
+                <p className="text-white/60 text-xs font-light">identity · BVN · bank details · secret salt</p>
               </div>
               <div className="text-center text-white/30 text-xs">↓ only a proof crosses ↓</div>
               <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
@@ -268,7 +268,7 @@ export default function LandingPage() {
           id: "escrow",
           headline: "Trustless",
           subheadline: "Non-Custodial Escrow",
-          body: "Smart contracts lock funds until both parties confirm — no middleman ever holds your crypto, and your keys never leave your device.",
+          body: "A smart contract locks your crypto until the fiat payout is confirmed — and if it isn't, a 1-hour time-lock refunds you automatically. No middleman ever holds your funds.",
           media: (
             <Panel label="How escrow protects you">
               <Feature label="Crypto locked in a smart contract" index={0} />
