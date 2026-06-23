@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import { LightBackground } from "../components/ui/background-snippets";
 
 export default function DocsPage() {
