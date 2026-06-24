@@ -17,6 +17,9 @@ model User {
   smartWalletAddress String?  @unique
   passkeyKeyId       String?
   pinHash            String?
+  shieldedOwner      String?  // published owner tag (Poseidon(sk)) for email-addressed transfers
+  shieldedEncPub     String?  // x25519 public key (hex) for encrypting note blobs to this user
+  shieldedAddress    String?  // shareable "shp_…" address
   createdAt          DateTime @default(now())
   attestation        ComplianceAttestation?
   bankAccounts       BankAccount[]
@@ -55,8 +58,8 @@ model Swap {
   id              String      @id @default(uuid())
   userId          String
   user            User        @relation(fields: [userId], references: [id])
-  bankAccountId   String
-  bankAccount     BankAccount @relation(fields: [bankAccountId], references: [id])
+  bankAccountId   String?      // optional: zero-storage architecture keeps bank details client-side
+  bankAccount     BankAccount? @relation(fields: [bankAccountId], references: [id])
   tokenAddress    String      // Any Stellar asset contract (USDC, XLM SAC, AQUA, ...)
   cryptoAmount    Float
   nairaAmount     Float
@@ -92,4 +95,40 @@ model WebhookEvent {
   tradeId         String?
   type            String
   receivedAt      DateTime @default(now())
+}
+
+// In-app notifications / activity feed. Every user action is logged here and surfaced
+// in the app (bell + feed). Push delivery (Web Push) layers on top for arriving events.
+model Notification {
+  id        String   @id @default(uuid())
+  email     String   // the user this notification belongs to
+  type      String   // FAUCET | SHIELD | UNSHIELD | WITHDRAW_FIAT | SEND_PUBLIC | SEND_SHIELDED | RECEIVE_SHIELDED | PAYOUT_SETTLED
+  title     String
+  body      String?
+  amount    String?
+  asset     String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+// Encrypted note blobs for V2 private transfers. The sender posts a blob encrypted to the
+// recipient's encPub; recipients scan (GET since cursor) and trial-decrypt with their key.
+// The backend stores ciphertext only — it cannot read these.
+model NoteBlob {
+  id           Int      @id @default(autoincrement()) // monotonic cursor for scanning
+  commitment   String                                  // on-chain output commitment (for verification)
+  ephemeralPub String                                  // x25519 ephemeral public (hex)
+  ciphertext   String                                  // nonce ‖ ct (hex)
+  createdAt    DateTime @default(now())
+}
+
+// Shielded-pool commitment tree: every appended leaf, in order. The backend
+// rebuilds the IncrementalMerkleTree from these to serve membership paths and to
+// generate merkle_insert proofs that advance the on-chain root trustlessly.
+model TreeLeaf {
+  index      Int      @id           // append-only position in the depth-20 tree
+  commitment String                 // BN254 field element (decimal string)
+  createdAt  DateTime @default(now())
 }

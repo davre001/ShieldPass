@@ -1,12 +1,19 @@
 import { Router } from 'express';
-import { TrustedIssuer, isValidSorobanAddress } from '@shieldpass/sdk';
+import { TrustedIssuer, isValidSorobanAddress, noteCommitment } from '@shieldpass/sdk';
 import { prisma } from '../db';
+import { treeService } from '../services/tree';
+import { notify } from './notifications';
 import { verifyBvn } from '../services/bvn';
 import { hashPin, verifyPin } from '../services/pin';
 import { seedWalletFromEnv, type SeedResult } from '../services/seed';
 
 const router = Router();
 const issuer = new TrustedIssuer();
+
+// Faucet seed is configurable (no hardcoded amount). Change FAUCET_NOTE_AMOUNT /
+// FAUCET_NOTE_ASSET in the backend env to adjust the onboarding seed someday.
+const FAUCET_NOTE_AMOUNT = BigInt(process.env.FAUCET_NOTE_AMOUNT || '500');
+const FAUCET_NOTE_ASSET = process.env.FAUCET_NOTE_ASSET || 'XLM';
 
 // Re-issue a compliance leaf from the user's current Tier flags and persist it.
 // hardwareAttested is always true once a passkey is linked; bvnVerified flips to true at Tier 2.
@@ -28,33 +35,53 @@ async function issueLeaf(userId: string, hardwareAttested: boolean, bvnVerified:
 // Issues a Tier 1 compliance leaf (hardwareAttested = true, bvnVerified = false) and returns the
 // secret salt. NO BVN required here — small swaps only need the hardware (passkey) attestation.
 router.post('/link-wallet', async (req, res) => {
-  const { email, pin, smartWalletAddress, passkeyKeyId } = req.body;
+  const { email, pin, smartWalletAddress, passkeyKeyId, shieldedOwner, shieldedEncPub, shieldedAddress } = req.body;
   if (!email || !smartWalletAddress) return res.status(400).json({ error: 'email and smartWalletAddress are required.' });
   if (!isValidSorobanAddress(smartWalletAddress)) return res.status(400).json({ error: 'Invalid smart wallet address.' });
   if (pin && !/^\d{4,6}$/.test(String(pin))) return res.status(400).json({ error: 'PIN must be 4-6 digits.' });
 
   try {
     const pinHash = pin ? hashPin(String(pin)) : undefined;
-    // Passkey-first: the user may not exist yet (no upfront BVN). Create or update by email.
+    // Publish the shielded identity (owner/encPub/address) so others can send by email.
+    const shielded = (shieldedOwner && shieldedEncPub) ? { shieldedOwner, shieldedEncPub, shieldedAddress } : {};
     const user = await prisma.user.upsert({
       where: { email },
-      update: { smartWalletAddress, passkeyKeyId: passkeyKeyId ?? null, ...(pinHash ? { pinHash } : {}) },
-      create: { email, smartWalletAddress, passkeyKeyId: passkeyKeyId ?? null, pinHash },
+      update: { smartWalletAddress, passkeyKeyId: passkeyKeyId ?? null, ...(pinHash ? { pinHash } : {}), ...shielded },
+      create: { email, smartWalletAddress, passkeyKeyId: passkeyKeyId ?? null, pinHash, ...shielded },
     });
 
     // Tier 1 leaf: hardware-attested, not yet BVN-verified.
     const leaf = await issueLeaf(user.id, true, false);
 
-    // Seed the brand-new smart wallet with test tokens (best-effort, never blocks linking).
-    let seeded: SeedResult[] = [];
+    // PRIVATE FAUCET (owner-based): seed a note OWNED by the user's shielded owner. The note
+    // is backed by the pool; the user holds the shielded key (sk) needed to spend it.
+    let faucetNote = null;
     try {
-      seeded = await seedWalletFromEnv(smartWalletAddress);
-      if (seeded.length) console.log(`[kyc/link-wallet] seeded ${smartWalletAddress}:`, seeded);
+      if (!shieldedOwner) throw new Error('no shielded owner published');
+      const noteAmount = FAUCET_NOTE_AMOUNT; // configurable via env
+      const randomness = BigInt(issuer.generateSecretSalt()); // per-note uniqueness
+      const compliance = { hardware_attested: 1n, bvn_verified: 0n, good_standing: 1n };
+      const commitment = noteCommitment(noteAmount, BigInt(shieldedOwner), randomness, compliance);
+
+      // Queue on-chain (faucet_seed) + advance the tree trustlessly (insert). No public transfer.
+      const { index } = await treeService.seedNote(commitment);
+
+      // The client keeps `randomness` (with their shielded key) to spend the note later.
+      faucetNote = {
+        amount: noteAmount.toString(),
+        randomness: randomness.toString(),
+        asset: FAUCET_NOTE_ASSET,
+        compliance: { hardware_attested: '1', bvn_verified: '0', good_standing: '1' },
+        leafIndex: index,
+        commitment: commitment.toString(),
+      };
+      console.log(`[kyc/link-wallet] seeded ${noteAmount} ${FAUCET_NOTE_ASSET} owner-based ZK Note at index ${index}.`);
+      await notify(email, 'FAUCET', `Welcome bonus received`, { amount: noteAmount.toString(), asset: FAUCET_NOTE_ASSET });
     } catch (seedErr) {
-      console.error('[kyc/link-wallet] seeding failed (non-fatal):', seedErr);
+      console.error('[kyc/link-wallet] private seeding failed:', seedErr);
     }
 
-    return res.json({ success: true, tier: 1, ...leaf, seeded });
+    return res.json({ success: true, tier: 1, ...leaf, faucetNote });
   } catch (err) {
     console.error('[kyc/link-wallet]', err);
     return res.status(409).json({ error: 'Could not link wallet (it may already be linked).' });

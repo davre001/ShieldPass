@@ -17,9 +17,17 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 // ── Real backend client ──
 export const api = {
   // Tier 1: passkey-first onboarding. Links the smart wallet and returns the compliance salt.
-  linkWallet: (input: { email: string; pin?: string; smartWalletAddress: string; passkeyKeyId?: string }) =>
-    request<{ success: boolean; tier: number; secretSalt: string; merkleRoot: string; leafIndex: number }>(
-      '/kyc/link-wallet', { method: 'POST', body: JSON.stringify(input) }),
+  linkWallet: (input: {
+    email: string; pin?: string; smartWalletAddress: string; passkeyKeyId?: string;
+    shieldedOwner?: string; shieldedEncPub?: string; shieldedAddress?: string;
+  }) =>
+    request<{
+      success: boolean; tier: number; secretSalt: string; merkleRoot: string; leafIndex: number;
+      faucetNote?: {
+        amount: string; randomness: string; asset: string; leafIndex: number; commitment: string;
+        compliance: { hardware_attested: string; bvn_verified: string; good_standing: string };
+      };
+    }>('/kyc/link-wallet', { method: 'POST', body: JSON.stringify(input) }),
 
   // Tier 2: BVN upgrade for high-value swaps. Returns a NEW (bvn-verified) compliance salt.
   submitBvn: (input: { email: string; phone?: string; bvn: string }) =>
@@ -51,11 +59,46 @@ export const api = {
     request<Quote>('/swap/quote', { method: 'POST', body: JSON.stringify(input) }),
 
   executeSwap: (input: {
-    email: string; bankAccountId: string; tokenAddress: string; cryptoAmount: number; assetCode?: string;
-    onChainSwapId: string; proof: string; publicInputs: string[]; nullifier: string;
-  }) => request<{ success: boolean; swap: SwapRecord; payout: { amountNaira: number; bank: string; transferId: string }; message: string }>(
+    email: string;
+    ephemeralBankDetails: { accountNumber: string; bankName: string; accountName: string };
+    tokenAddress: string; cryptoAmount: number; assetCode?: string;
+    onChainSwapId: string; nullifier?: string; changeCommitment?: string;
+  }) => request<{ success: boolean; swap: SwapRecord; changeLeafIndex: number | null; payout: { amountNaira: number; bank: string; transferId: string }; message: string }>(
     '/swap/execute', { method: 'POST', body: JSON.stringify(input) }),
 
   swapHistory: (email: string) =>
     request<SwapRecord[]>(`/swap/history?email=${encodeURIComponent(email)}`),
+
+  // ── Shielded tree ──
+  // Advance the tree for a commitment the user just queued on-chain via deposit().
+  treeInsert: (commitment: string) =>
+    request<{ index: number; root: string }>('/tree/insert', { method: 'POST', body: JSON.stringify({ commitment }) }),
+
+  // ── V2 private transfers ──
+  // Resolve a recipient's published shielded identity (by email).
+  lookupShielded: (email: string) =>
+    request<{ owner: string; encPub: string; address: string | null }>(`/notes/identity/${encodeURIComponent(email)}`),
+  // Post an encrypted note blob for the recipient to scan.
+  postNoteBlob: (input: { commitment: string; ephemeralPub: string; ciphertext: string }) =>
+    request<{ id: number }>('/notes/blob', { method: 'POST', body: JSON.stringify(input) }),
+  // Scan for new note blobs since a cursor (recipient trial-decrypts them).
+  scanNotes: (cursor: number) =>
+    request<{ blobs: { id: number; commitment: string; ephemeralPub: string; ciphertext: string }[]; nextCursor: number }>(
+      `/notes/since/${cursor}`),
+  // Resolve a commitment to its tree leaf index (so a received note can be spent).
+  treeIndexOf: (commitment: string) =>
+    request<{ index: number }>(`/tree/index/${commitment}`),
+
+  // ── Notifications / activity ──
+  notify: (input: { email: string; type: string; title: string; amount?: string; asset?: string; body?: string }) =>
+    request<{ ok: boolean }>('/notifications', { method: 'POST', body: JSON.stringify(input) }),
+  listNotifications: (email: string) =>
+    request<{ items: NotificationItem[]; unread: number }>(`/notifications?email=${encodeURIComponent(email)}`),
+  markNotificationsRead: (email: string) =>
+    request<{ ok: boolean }>('/notifications/read', { method: 'POST', body: JSON.stringify({ email }) }),
 };
+
+export interface NotificationItem {
+  id: string; type: string; title: string; body?: string;
+  amount?: string; asset?: string; read: boolean; createdAt: string;
+}

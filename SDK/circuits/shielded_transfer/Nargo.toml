@@ -1,7 +1,0 @@
-[package]
-name = "shielded_transfer"
-type = "bin"
-authors = ["ShieldPass"]
-compiler_version = ">=0.28.0"
-
-[dependencies]

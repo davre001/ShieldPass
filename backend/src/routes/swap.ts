@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { Networks, Keypair } from '@stellar/stellar-sdk';
-import { StellarContractClient } from '@shieldpass/sdk';
+import { ShieldedPoolClient } from '@shieldpass/sdk';
 import { prisma } from '../db';
-import { checkProof, burnNullifier } from '../services/compliance';
+import { burnNullifier } from '../services/compliance';
+import { treeService } from '../services/tree';
+import { notify } from './notifications';
 import { getQuote, TIER2_THRESHOLD_NAIRA } from '../services/quote';
 import { initiateTransfer as initiateLencoTransfer, type LencoTransferResult } from '../services/lenco';
 import { initiatePaystackTransfer } from '../services/paystack';
@@ -13,11 +15,6 @@ const CONTRACT_ID = process.env.STELLAR_CONTRACT_ID || '';
 const RELAYER_SECRET = process.env.STELLAR_RELAYER_SECRET || '';
 const RPC_URL = process.env.STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org';
 const NETWORK = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
-
-// Normalize a circuit field value ('1', '0x..01', 1) to a 0/1 string.
-function fieldToBit(v: unknown): string {
-  try { return BigInt(String(v)) === 1n ? '1' : '0'; } catch { return '0'; }
-}
 
 const NIGERIAN_BANKS = [
   { code: "044", name: "Access Bank" }, { code: "050", name: "Ecobank" },
@@ -38,60 +35,50 @@ router.post('/quote', (req, res) => {
   res.json({ ...quote, requireBvn, tier2ThresholdNaira: TIER2_THRESHOLD_NAIRA });
 });
 
-// POST /swap/execute — the core off-ramp orchestration.
-// 1) verify the (progressive) ZK proof  2) pay Naira via Lenco  3) claim the locked crypto on-chain.
+// POST /execute — the core off-ramp orchestration (trustless shielded-pool flow).
+// The ZK proof was already verified ON-CHAIN by the client's `confidential_swap`
+// call (which burned the note's nullifier, enforced the tier, and recorded a
+// pending payout under `onChainSwapId`). The backend therefore only:
+//   1) pays the Naira via Paystack/Lenco  2) calls `claim_swap(onChainSwapId)`
+// to sweep the swapped crypto to the treasury. No off-chain verification, no
+// fabricated settlement proof.
 router.post('/execute', async (req, res) => {
-  const { email, bankAccountId, tokenAddress, cryptoAmount, assetCode, onChainSwapId, proof, publicInputs, nullifier } = req.body;
+  const { email, ephemeralBankDetails, tokenAddress, cryptoAmount, assetCode, onChainSwapId, nullifier, changeCommitment } = req.body;
 
-  if (!email || !bankAccountId || !tokenAddress || !onChainSwapId) {
-    return res.status(400).json({ error: 'email, bankAccountId, tokenAddress and onChainSwapId are required.' });
+  if (!email || !ephemeralBankDetails || !tokenAddress || onChainSwapId === undefined || onChainSwapId === null) {
+    return res.status(400).json({ error: 'email, ephemeralBankDetails, tokenAddress and onChainSwapId are required.' });
   }
   if (!(Number(cryptoAmount) > 0)) return res.status(400).json({ error: 'cryptoAmount must be a positive number.' });
-  if (!proof || !nullifier || !Array.isArray(publicInputs)) {
-    return res.status(400).json({ error: 'proof, publicInputs[] and nullifier are required (KYC).' });
-  }
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) return res.status(404).json({ error: 'No account for that email.' });
-  const bank = await prisma.bankAccount.findUnique({ where: { id: bankAccountId } });
-  if (!bank || bank.userId !== user.id) return res.status(404).json({ error: 'Bank account not found for this user.' });
 
-  // 1. Price the swap and decide the required tier.
+  // ZERO-STORAGE ARCHITECTURE:
+  // We do not save or look up the bank account in the DB.
+  // We use the ephemeral details passed directly from the client's local storage.
+  const { accountNumber, bankName, accountName } = ephemeralBankDetails;
+
+  // 1. Price the swap (the contract already enforced the tier gate on-chain).
   const quote = getQuote(String(tokenAddress), Number(cryptoAmount), assetCode);
-  const requireBvn = quote.nairaAmount > TIER2_THRESHOLD_NAIRA ? '1' : '0';
 
-  // The proof's public require_bvn (last public input) must match what this swap demands — a user
-  // cannot off-ramp a high-value amount with a Tier 1 (require_bvn = 0) proof.
-  const provenRequireBvn = fieldToBit(publicInputs[publicInputs.length - 1]);
-  if (provenRequireBvn !== requireBvn) {
-    return res.status(400).json({
-      error: requireBvn === '1'
-        ? 'This amount requires identity verification (BVN). Upgrade to Tier 2 and retry.'
-        : 'Proof tier does not match the swap amount.',
-    });
-  }
-
-  // 2. Verify the ZK proof (replay-checked, cryptographically verified).
-  const check = await checkProof({ proof, publicInputs, nullifier });
-  if (!check.ok) return res.status(check.status).json({ error: check.error });
-
-  // Record the swap as locked-on-chain / fiat-processing before moving fiat.
+  // Record the swap as fiat-processing before moving fiat.
+  // Note: bankAccountId is nullified in DB structure per Zero-Storage architecture.
   const swap = await prisma.swap.create({
     data: {
-      userId: user.id, bankAccountId: bank.id, tokenAddress: String(tokenAddress),
+      userId: user.id, tokenAddress: String(tokenAddress),
       cryptoAmount: Number(cryptoAmount), nairaAmount: quote.nairaAmount,
       status: 'FIAT_PROCESSING', swapId: String(onChainSwapId),
     },
   });
 
-  // 3. Pay the Naira out to the user's bank account with redundancy (Paystack -> Lenco).
+  // 3. Pay the Naira out to the user's bank account ephemerally.
   let transfer: LencoTransferResult = await initiatePaystackTransfer({
     amountNaira: quote.nairaAmount,
-    accountNumber: bank.accountNumber,
-    bankCode: NIGERIAN_BANKS.find(b => b.name === bank.bankName)?.code, // Lookup nuban
-    bankName: bank.bankName,
-    accountName: bank.accountName,
-    reference: `ps_${swap.id}`, // Unique ref for Paystack
+    accountNumber: accountNumber,
+    bankCode: NIGERIAN_BANKS.find(b => b.name === bankName)?.code, 
+    bankName: bankName,
+    accountName: accountName,
+    reference: `ps_${swap.id}`, 
   });
 
   let processorUsed = 'Paystack';
@@ -100,11 +87,11 @@ router.post('/execute', async (req, res) => {
     console.warn(`[swap/execute] Paystack failed: ${transfer.error}. Falling back to Lenco...`);
     transfer = await initiateLencoTransfer({
       amountNaira: quote.nairaAmount,
-      accountNumber: bank.accountNumber,
-      bankCode: NIGERIAN_BANKS.find(b => b.name === bank.bankName)?.code,
-      bankName: bank.bankName,
-      accountName: bank.accountName,
-      reference: `lc_${swap.id}`, // Unique ref for Lenco
+      accountNumber: accountNumber,
+      bankCode: NIGERIAN_BANKS.find(b => b.name === bankName)?.code,
+      bankName: bankName,
+      accountName: accountName,
+      reference: `lc_${swap.id}`, 
     });
     processorUsed = 'Lenco';
   }
@@ -116,29 +103,46 @@ router.post('/execute', async (req, res) => {
   }
   await prisma.swap.update({ where: { id: swap.id }, data: { lencoTransferId: transfer.transferId } });
 
-  // 4. Fiat settled — burn the nullifier and claim the locked crypto into the treasury.
-  await burnNullifier(String(nullifier), user.smartWalletAddress || email, 'swap');
+  // 4. Fiat settled — record the spent nullifier (the contract is the authority;
+  // this is a convenience index) and claim the swapped crypto into the treasury.
+  if (nullifier) await burnNullifier(String(nullifier), user.smartWalletAddress || email, 'swap');
 
   let txHash: string | null = null;
   if (CONTRACT_ID && RELAYER_SECRET) {
     try {
-      const stellar = new StellarContractClient(RPC_URL, NETWORK, CONTRACT_ID);
-      txHash = await stellar.claimSwap(BigInt(onChainSwapId), Keypair.fromSecret(RELAYER_SECRET));
+      // admin (relayer) sweeps the pending payout to the treasury. If this never
+      // runs, the user reclaims their value trustlessly via refund_swap() after
+      // the on-chain time-lock.
+      const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
+      txHash = await pool.claimSwap(BigInt(onChainSwapId), Keypair.fromSecret(RELAYER_SECRET));
     } catch (err) {
       console.error('[swap/execute] claim_swap failed (fiat already paid):', err);
-      // Fiat paid but on-chain claim failed — keep COMPLETED for the fiat side; ops can re-claim.
     }
   }
 
   const completed = await prisma.swap.update({
     where: { id: swap.id }, data: { status: 'COMPLETED', txHash: txHash ?? undefined },
   });
+  await notify(email, 'WITHDRAW_FIAT', `₦${quote.nairaAmount.toLocaleString()} sent to ${bankName}`, { amount: String(quote.nairaAmount), asset: 'NGN' });
+
+  // 5. Insert the change note (already queued on-chain by confidential_swap) into the
+  // tree so the user can spend it later. Returns the new leaf index for the client.
+  let changeLeafIndex: number | null = null;
+  if (changeCommitment) {
+    try {
+      const { index } = await treeService.appendAndInsert(BigInt(changeCommitment));
+      changeLeafIndex = index;
+    } catch (e) {
+      console.error('[swap/execute] change-note insert failed:', e);
+    }
+  }
 
   res.json({
     success: true,
     swap: completed,
-    payout: { amountNaira: quote.nairaAmount, bank: `${bank.bankName} ${bank.accountNumber}`, transferId: transfer.transferId, processor: processorUsed },
-    message: `₦${quote.nairaAmount.toLocaleString()} sent to ${bank.bankName} ${bank.accountNumber}.`,
+    changeLeafIndex,
+    payout: { amountNaira: quote.nairaAmount, bank: `${bankName} ${accountNumber}`, transferId: transfer.transferId, processor: processorUsed },
+    message: `₦${quote.nairaAmount.toLocaleString()} sent to ${bankName} ${accountNumber}. (Bank Details deleted from memory)`,
   });
 });
 

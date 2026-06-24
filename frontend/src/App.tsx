@@ -12,6 +12,9 @@ import { SessionProvider, useSession } from "./lib/session";
 import LandingPage from "./pages/LandingPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import SwapPage from "./pages/SwapPage";
+import DepositPage from "./pages/DepositPage";
+import SendPage from "./pages/SendPage";
+import ActivityPage from "./pages/ActivityPage";
 import DashboardPage from "./pages/DashboardPage";
 import AboutPage from "./pages/AboutPage";
 import DocsPage from "./pages/DocsPage";
@@ -74,9 +77,31 @@ export default function App() {
           element={<OnboardingPage />}
         />
 
-        <Route path="/swap" element={
+        <Route path="/withdraw" element={
           <MainLayout walletComponent={<ProfileButton />}>
             <SwapPage />
+          </MainLayout>
+        } />
+        <Route path="/swap" element={<Navigate to="/withdraw" replace />} />
+
+        <Route path="/shield" element={
+          <MainLayout walletComponent={<ProfileButton />}>
+            <DepositPage />
+          </MainLayout>
+        } />
+        <Route path="/deposit" element={<Navigate to="/shield" replace />} />
+
+        <Route path="/unshield" element={<Navigate to="/shield" replace />} />
+
+        <Route path="/send" element={
+          <MainLayout walletComponent={<ProfileButton />}>
+            <SendPage />
+          </MainLayout>
+        } />
+
+        <Route path="/activity" element={
+          <MainLayout walletComponent={<ProfileButton />}>
+            <ActivityPage />
           </MainLayout>
         } />
 
@@ -99,7 +124,7 @@ export default function App() {
         } />
 
   {/* Redirect old marketplace links to swap */ }
-        <Route path="/marketplace" element={<Navigate to="/swap" replace />} />
+        <Route path="/marketplace" element={<Navigate to="/withdraw" replace />} />
 
         <Route path="*" element={
           <MainLayout walletComponent={<ProfileButton />}>

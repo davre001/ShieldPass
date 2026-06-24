@@ -3,15 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
-import { useZkProof } from "../lib/useZkProof";
+import { useSwapProof } from "../lib/useSwapProof";
 import ErrorNotice from "../components/ErrorNotice";
 import { Buffer } from "buffer";
 import type { BankAccount, Quote } from "../types";
 
-// Poseidon nullifier (decimal string) -> 32-byte big-endian BytesN<32> for the contract call.
-function nullifierToBytes(nullifier: string): Buffer {
-  const hex = BigInt(nullifier).toString(16).padStart(64, "0").slice(-64);
-  return Buffer.from(hex, "hex");
+const buf = (u8: Uint8Array): Buffer => Buffer.from(u8);
+// Random 254-bit field element (decimal) for the per-swap bank blinding salt.
+function randomSalt(): bigint {
+  const a = new Uint8Array(31);
+  crypto.getRandomValues(a);
+  let h = "0x";
+  for (const b of a) h += b.toString(16).padStart(2, "0");
+  return BigInt(h);
 }
 
 const fadeUp = {
@@ -54,7 +58,7 @@ const NIGERIAN_BANKS = [
 export default function SwapPage() {
   const navigate = useNavigate();
   const session = useSession();
-  const zk = useZkProof();
+  const swapProof = useSwapProof(import.meta.env.VITE_API_URL as string);
 
   // Swap State
   const [assetType, setAssetType] = useState(SUPPORTED_ASSETS[0]?.code ?? "");
@@ -82,17 +86,16 @@ export default function SwapPage() {
   const [bvnError, setBvnError] = useState<string | null>(null);
   const [verifyingBvn, setVerifyingBvn] = useState(false);
 
-  const proving = zk.status === "loading-circuit" || zk.status === "generating";
+  const proving = swapProof.status === "fetching-path" || swapProof.status === "loading-circuit" || swapProof.status === "generating";
 
   useEffect(() => {
     if (session.email) {
-      api.listBanks(session.email).then(data => {
-        setBanks(data);
-        if (data.length > 0 && !selectedBankId) {
-          const def = data.find(b => b.isDefault) || data[0];
-          setSelectedBankId(def.id);
-        }
-      }).catch(console.error);
+      // ZERO-STORAGE ARCHITECTURE: Read banks from local device storage
+      const localBanks = JSON.parse(localStorage.getItem(`banks_${session.email}`) || '[]');
+      setBanks(localBanks);
+      if (localBanks.length > 0 && !selectedBankId) {
+        setSelectedBankId(localBanks[0].id);
+      }
     }
   }, [session.email]);
 
@@ -126,14 +129,21 @@ export default function SwapPage() {
     const bankName = NIGERIAN_BANKS.find(b => b.code === bankCode)?.name || bankCode;
     try {
       setAddingBank(true);
-      const res = await api.addBank({
-        email: session.email,
+      
+      // ZERO-STORAGE ARCHITECTURE: Save to local device storage, not the DB
+      const newBank = {
+        id: Math.random().toString(36).slice(2),
         bankName,
         accountNumber,
         accountName,
-      });
-      setBanks([...banks, res.account]);
-      setSelectedBankId(res.account.id);
+        isDefault: false,
+      };
+      
+      const updatedBanks = [...banks, newBank];
+      setBanks(updatedBanks);
+      localStorage.setItem(`banks_${session.email}`, JSON.stringify(updatedBanks));
+      
+      setSelectedBankId(newBank.id);
       setShowAddBank(false);
       setBankCode("");
       setAccountNumber("");
@@ -200,34 +210,68 @@ export default function SwapPage() {
 
     try {
       setSwapping(true);
-      const pr = await zk.generateProof(session.secretSalt, session.merkleRoot, quote.requireBvn, session.bvnVerified);
-      if (!pr) throw new Error(zk.error || "Proof generation failed.");
 
       if (!session.wallet || !session.address) {
         throw new Error("Wallet not connected. Please log in again.");
       }
+      const swapAmt = BigInt(cryptoAmount);
+      const currentNote = session.notes.find((n) => BigInt(n.amount) >= swapAmt);
+      if (!currentNote) {
+        throw new Error("No single shielded note covers this amount. Shield more, or withdraw a smaller amount.");
+      }
+      const selectedBank = banks.find(b => b.id === selectedBankId);
+      if (!selectedBank) throw new Error("Bank details not found locally.");
 
-      // 1. Lock crypto on-chain through the smart account (passkey-signed, gasless via the relayer).
-      const locked = await session.wallet.invoke(escrowId, "lock_swap", {
-        user: session.address,
-        token_address: token.sac,
-        amount: BigInt(cryptoAmount),
-        nullifier: nullifierToBytes(pr.nullifier),
+      // 1. Prove the confidential swap in-browser (Groth16). Private note data stays local;
+      //    the contract verifies the proof on-chain. Spends session.note, mints a change note.
+      const pr = await swapProof.generate(
+        currentNote,
+        BigInt(cryptoAmount),
+        { accountNumber: BigInt(selectedBank.accountNumber.replace(/\D/g, "") || "0"), salt: randomSalt() },
+        quote.requireBvn,
+      );
+      if (!pr) throw new Error(swapProof.error || "Proof generation failed.");
+
+      // 2. Submit confidential_swap through the smart account (passkey-signed, gasless).
+      //    The deployed contract's spec encodes Vec<BytesN<32>> from an array of 32-byte Buffers.
+      const swapRes = await session.wallet.invoke(escrowId, "confidential_swap", {
+        proof_a: buf(pr.proof.a),
+        proof_b: buf(pr.proof.b),
+        proof_c: buf(pr.proof.c),
+        public_signals: pr.publicSignals.map(buf),
+        refund_commitment: buf(pr.refundCommitment),
       });
-      const onChainSwapId = String(locked.result);
+      const onChainSwapId = String(swapRes.result);
 
-      // 2. Execute Fiat via Backend
+      // 3. Backend pays the Naira, claims the crypto, and inserts the change note into the tree.
+      //    pr.publicSignals[1] is the change commitment (decimal) needed to advance the tree.
+      const changeCommitment = BigInt("0x" + Buffer.from(pr.publicSignals[1]).toString("hex")).toString();
       const exec = await api.executeSwap({
         email: session.email,
-        bankAccountId: selectedBankId,
+        ephemeralBankDetails: {
+          accountNumber: selectedBank.accountNumber,
+          bankName: selectedBank.bankName,
+          accountName: selectedBank.accountName,
+        },
         tokenAddress: token.sac,
         assetCode: token.code,
         cryptoAmount: Number(cryptoAmount),
         onChainSwapId,
-        proof: pr.proof,
-        publicInputs: pr.publicInputs,
         nullifier: pr.nullifier,
+        changeCommitment,
       });
+
+      // 4. Spend the note: drop it and add the change note (if any) as the new balance.
+      if (exec.changeLeafIndex !== null) {
+        const changeNotes = BigInt(pr.changeNote.amount) > 0n ? [{
+          amount: pr.changeNote.amount,
+          asset: currentNote.asset,
+          randomness: pr.changeNote.randomness,
+          leafIndex: exec.changeLeafIndex,
+          compliance: currentNote.compliance,
+        }] : [];
+        session.set({ notes: [...session.notes.filter((n) => n !== currentNote), ...changeNotes] });
+      }
 
       setSwapSuccess(`Success! ${exec.message}`);
       setCryptoAmount("");
@@ -247,7 +291,7 @@ export default function SwapPage() {
       <div className="w-full max-w-lg">
         <motion.div variants={fadeUp} className="text-center mb-8">
           <h1 className="geist-heading text-3xl sm:text-4xl md:text-5xl bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent font-medium">
-            Instant Swap
+            Withdraw
           </h1>
           <p className="text-white/40 text-sm mt-2 font-light">
             Trustless off-ramp. Crypto is time-locked until Naira hits your bank.
@@ -382,10 +426,11 @@ export default function SwapPage() {
                   </svg>
                 </div>
                 <h3 className="geist-heading text-2xl mb-3 text-white font-medium">Zero-Knowledge Proof</h3>
-                <p className="text-white/40 text-sm font-mono tracking-wider uppercase mb-8">{zk.status === "loading-circuit" ? "Loading circuit" : "Generating proof in-browser"}</p>
-                <div className="space-y-2 text-left font-mono text-xs border border-white/5 bg-white/[0.01] p-4 rounded-xl max-h-40 overflow-auto">
-                  {zk.log.map((line, i) => <div key={i} className="text-white/60">{line}</div>)}
-                </div>
+                <p className="text-white/40 text-sm font-mono tracking-wider uppercase mb-8">{
+                  swapProof.status === "fetching-path" ? "Fetching membership path"
+                    : swapProof.status === "loading-circuit" ? "Loading circuit"
+                    : "Generating proof in-browser"
+                }</p>
                 <p className="text-white/50 text-xs mt-6 leading-relaxed font-light">Your private credentials never leave your browser. A real ZK proof is generated locally to gate this action on-chain.</p>
               </div>
             </motion.div>

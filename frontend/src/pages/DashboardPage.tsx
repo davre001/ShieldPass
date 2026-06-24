@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
 import ErrorNotice from "../components/ErrorNotice";
+import ShieldedBalance from "../components/ShieldedBalance";
 import type { Balance, SwapRecord } from "../types";
 
 const RPC_URL = "https://soroban-testnet.stellar.org";
@@ -90,7 +91,7 @@ export default function DashboardPage() {
             <h1 className="geist-heading text-3xl sm:text-4xl md:text-5xl bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent font-medium">Portfolio Dashboard</h1>
             <p className="text-white/40 text-sm mt-2 font-light">Your smart-wallet balances and zero-knowledge swap history.</p>
           </div>
-          <Link to="/swap" className="px-5 py-2.5 rounded-full font-mono text-xs border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-2 group self-start md:self-auto text-white">
+          <Link to="/withdraw" className="px-5 py-2.5 rounded-full font-mono text-xs border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-2 group self-start md:self-auto text-white">
             Swap Crypto
             <svg className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
           </Link>
@@ -134,9 +135,13 @@ export default function DashboardPage() {
         {address && (
           <div className="space-y-12">
             <motion.section variants={fadeUp}>
+              <ShieldedBalance />
+            </motion.section>
+
+            <motion.section variants={fadeUp}>
               <h2 className="geist-heading text-xl sm:text-2xl mb-4 sm:mb-6 flex items-center gap-3 text-white font-medium">
                 <svg className="w-5 h-5 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                On-Chain Vault Balances
+                Available Balance (Wallet)
               </h2>
               {balancesLoading && <div className="flex items-center gap-3 text-white/50 text-sm border border-white/10 bg-white/5 p-6 rounded-2xl">Reading token contracts…</div>}
               {balancesError ? <ErrorNotice error={balancesError} className="border border-red-500/20 bg-red-500/[0.02] p-6 rounded-2xl" /> : null}

@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from "motion/react";
 import { GradientBackground } from "./ui/paper-design-shader-background";
 import { DarkBackground } from "./ui/background-snippets";
 import { useSession } from "../lib/session";
+import { useNoteScanner } from "../lib/useNoteScanner";
+import { api } from "../lib/api";
+import NotificationBell from "./NotificationBell";
 
 
 interface MainLayoutProps {
@@ -19,6 +22,13 @@ export default function MainLayout({
   const currentPath = location.pathname;
   const isActive = (path: string) => currentPath === path;
   const session = useSession();
+
+  // Background scan for incoming private payments; log a notification per new note.
+  useNoteScanner(import.meta.env.VITE_API_URL as string, (amount, asset) => {
+    if (session.email) {
+      api.notify({ email: session.email, type: "RECEIVE_SHIELDED", title: "Private payment received", amount, asset }).catch(() => {});
+    }
+  });
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -62,13 +72,31 @@ export default function MainLayout({
           </Link>
           )}
           <Link
-            to="/swap"
-            className={`flex items-center gap-2 transition-all duration-300 ${isActive("/swap") ? "opacity-100 font-semibold" : "opacity-60 hover:opacity-100"}`}
+            to="/shield"
+            className={`flex items-center gap-2 transition-all duration-300 ${isActive("/shield") ? "opacity-100 font-semibold" : "opacity-60 hover:opacity-100"}`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
-            Instant Swap
+            Shield
+          </Link>
+          <Link
+            to="/withdraw"
+            className={`flex items-center gap-2 transition-all duration-300 ${isActive("/withdraw") ? "opacity-100 font-semibold" : "opacity-60 hover:opacity-100"}`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20V8m0 0l-4 4m4-4l4 4M4 4h16" />
+            </svg>
+            Withdraw
+          </Link>
+          <Link
+            to="/send"
+            className={`flex items-center gap-2 transition-all duration-300 ${isActive("/send") ? "opacity-100 font-semibold" : "opacity-60 hover:opacity-100"}`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+            Send
           </Link>
           <Link
             to="/dashboard"
@@ -100,6 +128,7 @@ export default function MainLayout({
           </nav>
 
     <div className="flex items-center justify-end gap-4 flex-1">
+      {session.onboarded && <div className="z-10"><NotificationBell /></div>}
       {walletComponent && <div className="hidden md:block z-10">{walletComponent}</div>}
 
       {/* Mobile hamburger menu button */}
@@ -144,14 +173,34 @@ export default function MainLayout({
           </Link>
           )}
           <Link
-            to="/swap"
+            to="/shield"
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`flex items-center gap-3 py-4 border-b border-border ${isActive("/swap") ? "text-primary font-semibold" : "text-muted-foreground"}`}
+            className={`flex items-center gap-3 py-4 border-b border-border ${isActive("/shield") ? "text-primary font-semibold" : "text-muted-foreground"}`}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
-            Instant Swap
+            Shield
+          </Link>
+          <Link
+            to="/withdraw"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center gap-3 py-4 border-b border-border ${isActive("/withdraw") ? "text-primary font-semibold" : "text-muted-foreground"}`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20V8m0 0l-4 4m4-4l4 4M4 4h16" />
+            </svg>
+            Withdraw
+          </Link>
+          <Link
+            to="/send"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center gap-3 py-4 border-b border-border ${isActive("/send") ? "text-primary font-semibold" : "text-muted-foreground"}`}
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+            Send
           </Link>
           <Link
             to="/dashboard"

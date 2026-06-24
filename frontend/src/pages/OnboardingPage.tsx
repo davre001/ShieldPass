@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
 import { makeWallet } from "../lib/smartAccount";
+import { deriveIdentity } from "../lib/shieldedKey";
 import { humanizeError } from "@shieldpass/sdk/dist/errors";
 
 import { AnimatedLayout } from "../components/ui/animated-characters-login-page";
@@ -52,15 +53,19 @@ export default function OnboardingPage() {
       }
 
       let wallet, credentialId, address, secretSalt, merkleRoot, bvnVerified = false;
+      let note: import('../lib/session').ShieldedNote | null = null;
+      let identity: import('@shieldpass/sdk').ShieldedIdentity;
+      const toHex = (u8: Uint8Array) => Array.from(u8).map((b) => b.toString(16).padStart(2, '0')).join('');
 
       if (check?.ok && check.passkeyKeyId && check.smartWalletAddress) {
         // --- LOGIN FLOW ---
         wallet = await makeWallet();
         await wallet.connectWallet(check.passkeyKeyId, check.smartWalletAddress); // Prompts Face ID / Touch ID
-
-        const reissue = await api.reissueSalt({ email, pin });
         credentialId = check.passkeyKeyId;
         address = check.smartWalletAddress;
+        identity = await deriveIdentity(credentialId, pin, email); // same identity re-derived
+
+        const reissue = await api.reissueSalt({ email, pin });
         secretSalt = reissue.secretSalt;
         merkleRoot = reissue.merkleRoot;
         bvnVerified = reissue.bvnVerified;
@@ -69,16 +74,32 @@ export default function OnboardingPage() {
         // createWallet deploys the OZ smart account gaslessly via the relayer proxy (no manual submit).
         wallet = await makeWallet();
         const res = await wallet.createWallet("ShieldPass", email);
-
-        const linkRes = await api.linkWallet({ email, pin, smartWalletAddress: res.contractId, passkeyKeyId: res.credentialId });
         credentialId = res.credentialId;
         address = res.contractId;
+        identity = await deriveIdentity(credentialId, pin, email);
+
+        // publish the shielded identity so others can send by email; faucet note is owned by us.
+        const linkRes = await api.linkWallet({
+          email, pin, smartWalletAddress: res.contractId, passkeyKeyId: res.credentialId,
+          shieldedOwner: identity.owner.toString(), shieldedEncPub: toHex(identity.encPublic), shieldedAddress: identity.address,
+        });
         secretSalt = linkRes.secretSalt;
         merkleRoot = linkRes.merkleRoot;
+        if (linkRes.faucetNote) {
+          note = {
+            amount: linkRes.faucetNote.amount,
+            asset: linkRes.faucetNote.asset,
+            randomness: linkRes.faucetNote.randomness,
+            leafIndex: linkRes.faucetNote.leafIndex,
+            compliance: linkRes.faucetNote.compliance,
+          };
+        }
       }
 
       session.set({
-        wallet, credentialId, address, email, secretSalt, merkleRoot, bvnVerified
+        wallet, identity, shieldedAddress: identity.address,
+        credentialId, address, email, secretSalt, merkleRoot, bvnVerified,
+        notes: note ? [note] : [],
       });
       setStage("done");
     } catch (err) {

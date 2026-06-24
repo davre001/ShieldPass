@@ -24,6 +24,11 @@ export default defineConfig({
         find: /^@shieldpass\/sdk\/dist\/(.+)$/,
         replacement: path.resolve(import.meta.dirname, '../SDK/src/$1.ts'),
       },
+      // Let the node `buffer`/`process` imports (used by smart-account-kit, snarkjs, etc.)
+      // resolve to the real browser-compatible npm packages, pinned to absolute paths so
+      // files in sibling node_modules (SDK) resolve them too. Globals are set in main.tsx.
+      { find: /^buffer$/, replacement: path.resolve(import.meta.dirname, 'node_modules/buffer/index.js') },
+      { find: /^process$/, replacement: path.resolve(import.meta.dirname, 'node_modules/process/browser.js') },
     ],
     dedupe: ['@aztec/bb.js'],
   },

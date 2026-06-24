@@ -1,7 +1,0 @@
-[package]
-name = "reusable_kyc"
-type = "bin"
-authors = ["ShieldPass"]
-
-[dependencies]
-poseidon = { tag = "v0.3.0", git = "https://github.com/noir-lang/poseidon" }

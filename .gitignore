@@ -39,3 +39,7 @@ docs
 # Prisma 7 generated client (regenerated at build via prisma generate)
 backend/src/generated/
 hh
+
+# Circom build workspace — intermediates (ptau, zkeys, wasm); runtime copies live in backend/circuits + frontend/public
+SDK/circom/build/
+*.ptau
