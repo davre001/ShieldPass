@@ -18,8 +18,14 @@ function fieldTo32(x: bigint): Uint8Array {
     const h = (x % FIELD_ORDER).toString(16).padStart(64, '0');
     return Uint8Array.from(h.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
 }
-const b64url = (u8: Uint8Array) => Buffer.from(u8).toString('base64url');
-const fromB64url = (s: string) => new Uint8Array(Buffer.from(s, 'base64url'));
+// base64url without relying on Buffer's 'base64url' encoding (unsupported by the browser
+// `buffer` polyfill) — use standard base64 + URL-safe char swap.
+const b64url = (u8: Uint8Array) =>
+    Buffer.from(u8).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const fromB64url = (s: string) => {
+    const b64 = s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4);
+    return new Uint8Array(Buffer.from(b64, 'base64'));
+};
 const utf8 = (s: string) => new TextEncoder().encode(s);
 
 export interface ShieldedIdentity {
