@@ -191,8 +191,8 @@ export default function LandingPage() {
         {
           id: "hero",
           headline: "ShieldPass",
-          subheadline: <RevealText text="Zero-Knowledge Swaps" />,
-          body: <TypewriterText text="Trade crypto for naira with zero identity exposure — powered by ZK proofs on Stellar." />,
+          subheadline: <RevealText text="Private Swaps & Payments" />,
+          body: <TypewriterText text="Swap crypto for naira and send funds privately — with zero identity exposure. Every proof is verified on-chain on Stellar." />,
           action: (
             <div className="space-y-5">
               <div className="flex flex-wrap items-center gap-3">
@@ -201,6 +201,7 @@ export default function LandingPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Pill>Stellar Testnet</Pill>
+                <Pill>On-chain ZK</Pill>
                 <Pill>Gasless</Pill>
                 <Pill>No Seed Phrase</Pill>
               </div>
@@ -249,14 +250,17 @@ export default function LandingPage() {
           id: "passkeys",
           headline: "Passkeys",
           subheadline: "No Seed Phrase, No Gas",
-          body: <TypewriterText text="Your wallet is a passkey — unlock it with Face ID, a fingerprint, or your device PIN. Every transaction is sponsored, so you never need XLM to begin." delayStart={0.2} />,
+          body: <TypewriterText text="Your wallet is a passkey — unlock it with Face ID, a fingerprint, or your device PIN. Your private spending key is derived from it, so resetting your PIN never risks your funds. Every transaction is sponsored." delayStart={0.2} />,
           media: (
             <Panel label="Sign in with">
               <Feature label="Face ID" index={0} />
               <Feature label="Fingerprint" index={1} />
               <Feature label="Device PIN (Windows Hello)" index={2} />
               <Feature label="Your phone — scan the QR" index={3} />
-              <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
+              <div className="mt-3 rounded-lg border border-[#06ffa5]/20 bg-[#06ffa5]/[0.04] px-4 py-3">
+                <p className="text-white/70 text-xs font-light">Your <span className="text-[#06ffa5] font-mono">shielded key</span> is derived from your passkey</p>
+              </div>
+              <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
                 <p className="text-white/70 text-xs font-light">
                   <span className="text-[#06ffa5] font-mono">0 XLM</span> needed — fees sponsored via OpenZeppelin Channels
                 </p>
@@ -265,15 +269,59 @@ export default function LandingPage() {
           ),
         },
         {
-          id: "escrow",
-          headline: "Trustless",
-          subheadline: "Non-Custodial Escrow",
-          body: "A smart contract locks your crypto until the fiat payout is confirmed — and if it isn't, a 1-hour time-lock refunds you automatically. No middleman ever holds your funds.",
+          id: "shielded-pool",
+          headline: "Shielded",
+          subheadline: <RevealText text="Pool" />,
+          body: "Your balance isn't a public escrow — it's a secret note inside a shared pool, owned by your shielded key. Everyone's funds mix together, so no one watching the chain can tell which note is yours.",
           media: (
-            <Panel label="How escrow protects you">
-              <Feature label="Crypto locked in a smart contract" index={0} />
-              <Feature label="Released only on confirmed payment" index={1} />
-              <Feature label="No middleman can freeze funds" index={2} />
+            <Panel label="Your money, hidden in a crowd">
+              <Feature label="Funds held as secret notes" index={0} />
+              <Feature label="All balances mixed in one pool" index={1} />
+              <Feature label="Unlinkable — no one sees which is yours" index={2} />
+              <Feature label="Spend only with your shielded key" index={3} />
+            </Panel>
+          ),
+        },
+        {
+          id: "onchain-zk",
+          headline: "Verified",
+          subheadline: "On-Chain",
+          body: "No trusted verifier. The Soroban smart contract checks every zero-knowledge proof itself, on-chain, using Stellar's native BN254 pairing functions. The math is the only authority.",
+          media: (
+            <Panel label="Trust the math, not the server">
+              <Feature label="Groth16 proofs verified on-chain" index={0} />
+              <Feature label="Native bn254 pairing-check" index={1} />
+              <Feature label="No off-chain verifier to trust" index={2} />
+              <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
+                <p className="text-white/70 text-xs font-light"><span className="text-[#06ffa5] font-mono">~37.5M</span> instructions per verify — well within budget</p>
+              </div>
+            </Panel>
+          ),
+        },
+        {
+          id: "private-payments",
+          headline: "Private",
+          subheadline: <RevealText text="Payments" />,
+          body: "Send funds to another ShieldPass user by email or shielded address. The money never leaves the pool — your note is spent, theirs is created — and the amount, sender, and receiver all stay hidden.",
+          media: (
+            <Panel label="Send like a locked, nameless envelope">
+              <Feature label="Amount hidden" index={0} />
+              <Feature label="Sender & receiver hidden" index={1} />
+              <Feature label="Delivered via an encrypted note" index={2} />
+              <Feature label="Recipient's balance just goes up" index={3} />
+            </Panel>
+          ),
+        },
+        {
+          id: "refund",
+          headline: "Trustless",
+          subheadline: "Refund",
+          body: "Cashing out? Your crypto is committed with a refund note before any fiat moves. If the naira payout ever fails, you reclaim your value automatically after a 1-hour time-lock. The platform can never simply keep your crypto.",
+          media: (
+            <Panel label="Math-enforced safety net">
+              <Feature label="Refund note pre-committed on-chain" index={0} />
+              <Feature label="Auto-reclaim after 1 hour if fiat fails" index={1} />
+              <Feature label="No middleman can freeze your funds" index={2} />
               <Feature label="Your keys never leave your device" index={3} />
             </Panel>
           ),
@@ -332,29 +380,29 @@ export default function LandingPage() {
         {
           id: "how-it-works-2",
           headline: "Step 2",
-          subheadline: "Trustless Escrow",
-          body: "Initiate a swap. Your assets are locked securely in a smart contract. No middleman can access your funds while the bank transfer completes.",
+          subheadline: "Prove & Spend",
+          body: "To swap or send, your phone generates a zero-knowledge proof that spends your secret note. The smart contract verifies it on-chain — no trusted server, and amounts stay hidden inside the pool.",
           media: (
-            <Panel label="Step 2 · Lock">
+            <Panel label="Step 2 · Prove">
               <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-5 text-center">
                 <AnimatedLock />
-                <p className="text-white/70 text-xs font-light">Crypto locked in escrow</p>
+                <p className="text-white/70 text-xs font-light">Proof verified on-chain</p>
               </div>
-              <Feature label="Funds safe until settlement" index={0} />
+              <Feature label="Funds stay in the shielded pool" index={0} />
             </Panel>
           ),
         },
         {
           id: "how-it-works-3",
           headline: "Step 3",
-          subheadline: "Instant Settlement",
-          body: "Once fiat payment is confirmed, the smart contract instantly releases the crypto to the treasury. Fast, secure, and private.",
+          subheadline: "Settle or Send",
+          body: "Cash out to naira — paid straight to your bank — or send privately to another user. Your change stays shielded, and a refund time-lock protects every withdrawal.",
           media: (
-            <Panel label="Step 3 · Settle">
-              <Feature label="Naira payout sent to bank" index={0} />
-              <Feature label="Time-lock auto-refunds if failed" index={1} />
+            <Panel label="Step 3 · Done">
+              <Feature label="Naira payout to your bank" index={0} />
+              <Feature label="…or a fully private transfer" index={1} />
               <div className="mt-2 rounded-lg border border-[#06ffa5]/20 bg-[#06ffa5]/[0.05] px-4 py-3 text-center">
-                <span className="text-[#06ffa5] text-sm font-mono">✓ SWAP COMPLETE</span>
+                <span className="text-[#06ffa5] text-sm font-mono">✓ DONE — PRIVATELY</span>
               </div>
             </Panel>
           ),
@@ -366,10 +414,11 @@ export default function LandingPage() {
           body: "The questions every Swap user asks — answered up front.",
           media: (
             <div className="w-full p-5 sm:p-6 flex flex-col gap-3 justify-center">
-              <Faq q="What if the fiat doesn't arrive?" a="Your crypto stays locked in the escrow time-lock. If the bank transfer fails, the contract refunds your crypto automatically after 1 hour." index={0} />
-              <Faq q="Is ShieldPass custodial?" a="No. Funds sit in a smart contract and your passkey never leaves your device — we can't touch either." index={1} />
-              <Faq q="I lost my device — can I recover?" a="A passkey is device-bound. Add a backup signer to your wallet so a lost device doesn't mean lost funds." index={2} />
-              <Faq q="What does it cost?" a="Transactions are gasless — fees are sponsored, so you don't need any XLM to trade on testnet." index={3} />
+              <Faq q="Can people see my balance or payments?" a="No. Balances are secret notes in a shielded pool, and private transfers hide the amount, sender, and receiver. Only zero-knowledge proofs ever go on-chain." index={0} />
+              <Faq q="Who verifies the proofs?" a="The smart contract itself, on-chain, using Stellar's native BN254 pairing functions. There is no trusted off-chain verifier to rely on." index={1} />
+              <Faq q="What if the fiat doesn't arrive?" a="Each withdrawal pre-commits a refund note. If the bank transfer fails, you reclaim your crypto automatically after a 1-hour time-lock." index={2} />
+              <Faq q="I lost my device — can I recover?" a="Your passkey is device-bound; add a backup signer so a lost device doesn't mean lost funds." index={3} />
+              <Faq q="What does it cost?" a="Transactions are gasless — fees are sponsored, so you don't need any XLM to start on testnet." index={4} />
             </div>
           ),
         },

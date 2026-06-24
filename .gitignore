@@ -33,7 +33,8 @@ test-frontend.html
 
 contract_details.md
 frontend-tester
-docs
+docs/*
+!docs/assets/
 
 
 # Prisma 7 generated client (regenerated at build via prisma generate)
