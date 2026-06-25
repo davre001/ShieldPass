@@ -14,8 +14,34 @@ export interface HumanError {
 
 const MAX_DETAIL = 600;
 
+/**
+ * Dynamically extract the contract address and method name from a
+ * "Contract <ID> has no method \"<fn>\"" error thrown by the Stellar SDK,
+ * and return a user-friendly title that includes the actual contract address
+ * so the error message updates automatically whenever the contract changes.
+ */
+function buildNoMethodTitle(raw: string): string | null {
+  // Matches: Contract CXXX has no method "deposit"
+  const m = raw.match(/Contract\s+([A-Z2-7]{56})\s+has no method\s+["']?(\w+)["']?/i);
+  if (!m) return null;
+  const [, contractId, method] = m;
+  const short = `${contractId.slice(0, 8)}…${contractId.slice(-6)}`;
+  return `Contract ${short} doesn't support "${method}". The contract address in your environment may be wrong or outdated.`;
+}
+
 // Most specific → least specific. First matching rule wins.
-const RULES: { test: RegExp; title: string }[] = [
+const RULES: { test: RegExp; title: string | ((raw: string) => string) }[] = [
+  {
+    // Dynamic: contract address mismatch — "Contract CXXX has no method \"deposit\"".
+    // Title is built at runtime so it always reflects the actual contract in the error.
+    test: /has no method/i,
+    title: (raw: string) => buildNoMethodTitle(raw) ?? 'The contract rejected this call — the contract address may be misconfigured.',
+  },
+  {
+    // Contract not found / wrong address deployed.
+    test: /contract.*not found|no contract.*deployed|no such contract|invalid contract/i,
+    title: 'Contract not found on-chain. The configured contract address may be wrong.',
+  },
   {
     // On-chain token transfer reverted: a panicking contract traps the WASM VM.
     // In this app that almost always means the wallet has nothing to lock.
@@ -70,5 +96,7 @@ export function humanizeError(err: unknown): HumanError {
   const raw = rawMessage(err);
   const detail = raw.length > MAX_DETAIL ? `${raw.slice(0, MAX_DETAIL - 1)}…` : raw;
   const rule = RULES.find((r) => r.test.test(raw));
-  return { title: rule ? rule.title : FALLBACK, detail };
+  if (!rule) return { title: FALLBACK, detail };
+  const title = typeof rule.title === 'function' ? rule.title(raw) : rule.title;
+  return { title, detail };
 }
