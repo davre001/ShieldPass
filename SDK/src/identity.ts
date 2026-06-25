@@ -1,8 +1,8 @@
-import { x25519 } from '@noble/curves/ed25519';
-import { xchacha20poly1305 } from '@noble/ciphers/chacha';
-import { hkdf } from '@noble/hashes/hkdf';
-import { sha256 } from '@noble/hashes/sha2';
-import { randomBytes } from '@noble/hashes/utils';
+import { x25519 } from '@noble/curves/ed25519.js';
+import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
+import { hkdf } from '@noble/hashes/hkdf.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { randomBytes } from '@noble/hashes/utils.js';
 import { ownerOf } from './notes';
 
 // BN254 scalar field order.
