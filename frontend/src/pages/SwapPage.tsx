@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { api } from "../lib/api";
@@ -330,7 +330,7 @@ export default function SwapPage() {
               <select
                 className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white font-semibold outline-none cursor-pointer hover:bg-white/20 transition-colors"
                 value={assetType} onChange={(e) => setAssetType(e.target.value)}
-              >
+              />
                 {SUPPORTED_SWAP_ASSETS.map((a) => <option key={a.code} value={a.code} className="bg-zinc-900">{a.code} - {a.name}</option>)}
             </div>
           </div>
