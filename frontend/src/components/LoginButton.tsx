@@ -4,8 +4,7 @@ import { useSession } from "../lib/session";
 import { makeWallet } from "../lib/smartAccount";
 import { api } from "../lib/api";
 import { humanizeError } from "@shieldpass/sdk/dist/errors";
-import { deriveIdentityFromSeed, deriveSeed, type IdentitySource } from "../lib/shieldedKey";
-import { unlockBankVault } from "../lib/bankVault";
+import { unlockIdentityAndVault } from "../lib/authCeremony";
 
 /**
  * "Log in" for returning users.
@@ -18,25 +17,6 @@ export default function LoginButton({ className }: { className?: string }) {
   const session = useSession();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
-
-  async function resolveIdentityMaterial(credentialId: string | undefined, email: string): Promise<{ source: IdentitySource; seed: Uint8Array }> {
-    try {
-      const seed = await deriveSeed({ kind: "passkey", credentialId });
-      return { source: { kind: "passkey", credentialId }, seed };
-    } catch {
-      const recovery = window.prompt("Passkey PRF is unavailable. Enter your recovery phrase:");
-      if (recovery && recovery.trim()) {
-        const seed = await deriveSeed({ kind: "recovery", phrase: recovery.trim() });
-        return { source: { kind: "recovery", phrase: recovery.trim() }, seed };
-      }
-      const password = window.prompt("Or enter your password:");
-      if (password && password.trim()) {
-        const seed = await deriveSeed({ kind: "password", password: password.trim(), email });
-        return { source: { kind: "password", password: password.trim(), email }, seed };
-      }
-      throw new Error("A recovery phrase or password is required.");
-    }
-  }
 
   async function handleLogin() {
     setBusy(true);
@@ -61,9 +41,7 @@ export default function LoginButton({ className }: { className?: string }) {
       const { ok } = await api.verifyPin({ email, pin });
       if (!ok) { alert("Incorrect PIN."); return; }
 
-      const identityMaterial = await resolveIdentityMaterial(credentialId, email);
-      const identity = deriveIdentityFromSeed(identityMaterial.seed);
-      await unlockBankVault(identityMaterial.seed, email);
+      const { identity } = await unlockIdentityAndVault(email, credentialId);
 
       // The compliance salt is client-only; if it's missing (new device) mint a fresh one.
       let secretSalt = session.secretSalt, merkleRoot = session.merkleRoot;
