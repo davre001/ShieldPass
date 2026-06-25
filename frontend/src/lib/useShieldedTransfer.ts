@@ -1,9 +1,21 @@
 import { useState } from "react";
 import { Buffer } from "buffer";
 import {
-    buildTransferInput, prove, ownerOf, noteCommitment, randomField,
-    encryptNote, decodeAddress, type Compliance,
-} from "@shieldpass/sdk";
+    buildTransferInput,
+} from "@shieldpass/sdk/dist/circuitInputs";
+import {
+    prove,
+} from "@shieldpass/sdk/dist/groth16Prover";
+import {
+    ownerOf,
+    noteCommitment,
+    type Compliance,
+} from "@shieldpass/sdk/dist/notes";
+import {
+    encryptNote,
+    decodeAddress,
+    randomField,
+} from "@shieldpass/sdk/dist/identity";
 import { api } from "./api";
 import { useSession, type ShieldedNote } from "./session";
 import { assetByCode } from "./assets";

@@ -6,6 +6,7 @@ import { useSession } from "../lib/session";
 import { makeWallet } from "../lib/smartAccount";
 import { humanizeError } from "@shieldpass/sdk/dist/errors";
 import { unlockIdentityAndVault } from "../lib/authCeremony";
+import type { ShieldedIdentity } from "@shieldpass/sdk/dist/identity";
 
 import { AnimatedLayout } from "../components/ui/animated-characters-login-page";
 
@@ -54,7 +55,7 @@ export default function OnboardingPage() {
 
       let wallet, credentialId, address, secretSalt, merkleRoot, bvnVerified = false;
       let note: import('../lib/session').ShieldedNote | null = null;
-      let identity: import('@shieldpass/sdk').ShieldedIdentity;
+      let identity: ShieldedIdentity;
       const toHex = (u8: Uint8Array) => Array.from(u8).map((b) => b.toString(16).padStart(2, '0')).join('');
 
       if (check?.ok && check.passkeyKeyId && check.smartWalletAddress) {

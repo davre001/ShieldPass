@@ -1,8 +1,19 @@
 import { useState } from 'react';
 import {
-    buildSwapInputFromPath, prove, serializeProof, fieldToBytes32,
-    noteCommitment, ownerOf, randomField, type Compliance, type SerializedProof,
-} from '@shieldpass/sdk';
+    buildSwapInputFromPath,
+} from '@shieldpass/sdk/dist/circuitInputs';
+import {
+    fieldToBytes32,
+    prove,
+    serializeProof,
+    type SerializedProof,
+} from '@shieldpass/sdk/dist/groth16Prover';
+import {
+    noteCommitment,
+    ownerOf,
+    type Compliance,
+} from '@shieldpass/sdk/dist/notes';
+import { randomField } from '@shieldpass/sdk/dist/identity';
 import { useSession, type ShieldedNote } from './session';
 
 export type SwapProofStatus = 'idle' | 'fetching-path' | 'loading-circuit' | 'generating' | 'done' | 'error';

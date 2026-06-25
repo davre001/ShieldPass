@@ -1,5 +1,5 @@
-import { deriveShieldedIdentity, type ShieldedIdentity } from "@shieldpass/sdk";
-import { argon2idAsync } from "@noble/hashes/argon2.js";
+import { deriveShieldedIdentity, type ShieldedIdentity } from "@shieldpass/sdk/dist/identity";
+import { argon2idAsync } from "@noble/hashes/argon2";
 
 const PRF_SALT = new TextEncoder().encode("shieldpass-prf-v3");
 const RECOVERY_SALT = new TextEncoder().encode("shieldpass-recovery-v1");

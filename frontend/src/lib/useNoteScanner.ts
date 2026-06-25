@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { decryptNote } from "@shieldpass/sdk";
+import { decryptNote } from "@shieldpass/sdk/dist/identity";
 import { api } from "./api";
 import { useSession } from "./session";
 

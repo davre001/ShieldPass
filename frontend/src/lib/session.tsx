@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { SmartAccountWalletClient } from '@shieldpass/sdk/dist/smartAccount'
-import type { ShieldedIdentity } from '@shieldpass/sdk'
+import type { ShieldedIdentity } from '@shieldpass/sdk/dist/identity'
 import { lockBankVault } from './bankVault'
 
 /** A shielded note the user owns (owner-based model; spent with the user's shielded key). */
