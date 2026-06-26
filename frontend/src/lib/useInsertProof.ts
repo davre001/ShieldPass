@@ -18,7 +18,6 @@
 
 import { api } from './api';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 // Module-level cache so circuit files are only downloaded once per page load.
 let cachedWasm: Uint8Array | null = null;
