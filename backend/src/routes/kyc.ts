@@ -91,7 +91,8 @@ router.post('/link-wallet', async (req, res) => {
         circuitInput,
       };
       console.log(`[kyc/link-wallet] seeded ${noteAmount} ${FAUCET_NOTE_ASSET} owner-based ZK Note at index ${index}.`);
-      await notify(email, 'FAUCET', `Welcome bonus received`, { amount: noteAmount.toString(), asset: FAUCET_NOTE_ASSET });
+      const displayAmount = (Number(noteAmount) / 1e7).toString(); // convert stroops → XLM for display
+      await notify(email, 'FAUCET', `Welcome bonus received`, { amount: displayAmount, asset: FAUCET_NOTE_ASSET });
     } catch (seedErr) {
       console.error('[kyc/link-wallet] private seeding failed:', seedErr);
     }
