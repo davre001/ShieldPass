@@ -80,11 +80,15 @@ class TreeService {
         try {
             const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
             const chainIndex = await pool.nextIndex();
-            const dbIndex = this.tree.nextIndex;
-            if (chainIndex !== dbIndex) {
+            // Compare CONFIRMED DB leaves only — pending leaves are legitimately
+            // ahead of the chain (they are in-flight proofs, not committed yet).
+            const confirmedCount = await prisma.treeLeaf.count({ where: { status: 'confirmed' } });
+            if (chainIndex !== confirmedCount) {
                 throw new Error(
-                    `[tree] DIVERGED: DB has ${dbIndex} leaves, chain has ${chainIndex}. ` +
-                    `Redeploy the contract to reset on-chain state, then clear the DB.`
+                    `[tree] DIVERGED: DB has ${confirmedCount} confirmed leaves, chain has ${chainIndex}. ` +
+                    `A previous insert tx likely failed after the DB was marked confirmed. ` +
+                    `To recover without redeploying, run in Neon: ` +
+                    `UPDATE "TreeLeaf" SET status='pending' WHERE status='confirmed' AND index >= ${chainIndex};`
                 );
             }
         } catch (e: any) {
@@ -141,6 +145,10 @@ class TreeService {
         if (CONTRACT_ID && RELAYER_SECRET) {
             const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
             txHash = await pool.insert(proof, publicSignals, Keypair.fromSecret(RELAYER_SECRET));
+            // Wait for the tx to be committed before marking the leaf confirmed.
+            // If the tx fails on-chain the leaf stays pending and the retry mechanism
+            // can re-submit a fresh proof without DB/chain divergence.
+            await pool.waitForLanding(txHash);
             console.log(`[tree/confirm] index=${index} tx=${txHash}`);
         }
 

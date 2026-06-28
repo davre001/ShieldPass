@@ -7,6 +7,7 @@ import { useSwapProof } from "../lib/useSwapProof";
 import { useShieldedTransfer } from "../lib/useShieldedTransfer";
 import ErrorNotice from "../components/ErrorNotice";
 import { PUBLIC_ASSETS, assetByCode, formatUnits, parseUnits } from "../lib/assets";
+import { useWalletBalance } from "../lib/useWalletBalance";
 import { addContact, loadContacts, removeContact, type SavedRecipient } from "../lib/bankVault";
 import { useInsertProof } from "../lib/useInsertProof";
 
@@ -68,6 +69,15 @@ export default function SendPage() {
   const shieldedAssets = Array.from(new Set(session.notes.map((n) => n.asset || "XLM")));
   const selectedAsset = assetByCode(assetCode);
   const short = (value: string) => `${value.slice(0, 6)}...${value.slice(-4)}`;
+
+  const { balance: walletBalance, loading: walletLoading } = useWalletBalance(
+    isShielded ? "" : assetCode,
+    session.address,
+  );
+  const shieldedTotal = session.notes
+    .filter((n) => (n.asset || "XLM") === assetCode)
+    .reduce((sum, n) => sum + BigInt(n.amount), 0n);
+  const shieldedBalanceStr = formatUnits(shieldedTotal, selectedAsset?.decimals ?? 7, 4);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,7 +177,9 @@ export default function SendPage() {
     if (!asset) throw new Error("Asset not configured.");
     const units = parseUnits(amount, asset.decimals);
     if (units <= 0n) throw new Error("Amount must be greater than zero.");
-    await session.wallet!.invoke(asset.sac, "transfer", { from: session.address, to, amount: units });
+    // Use transferToken instead of invoke — native SACs (XLM etc.) have no uploadable
+    // Wasm, so contract.Client.from() crashes. transferToken builds XDR directly.
+    await session.wallet!.transferToken(asset.sac, to, units);
     setSuccess(`Sent ${formatUnits(units, asset.decimals, 4)} ${asset.code} to ${short(to)}.`);
     api.notify({ email: session.email, type: "SEND_PUBLIC", title: "Sent", amount: formatUnits(units, asset.decimals, 4), asset: asset.code }).catch(() => {});
   }
@@ -334,7 +346,18 @@ export default function SendPage() {
               </div>
 
               <div>
-                <label className="text-white/40 text-xs font-mono tracking-wider uppercase">Amount ({assetCode})</label>
+                <div className="flex items-baseline justify-between">
+                  <label className="text-white/40 text-xs font-mono tracking-wider uppercase">Amount ({assetCode})</label>
+                  <span className="text-[11px] text-white/35">
+                    {isShielded
+                      ? `Shielded: ${shieldedBalanceStr} ${assetCode}`
+                      : walletLoading
+                      ? "Loading balance…"
+                      : walletBalance != null
+                      ? `Available: ${walletBalance} ${assetCode}`
+                      : null}
+                  </span>
+                </div>
                 <input
                   type="number"
                   min="0"

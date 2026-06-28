@@ -7,7 +7,7 @@ import { useSwapProof } from "../lib/useSwapProof";
 import ErrorNotice from "../components/ErrorNotice";
 import { Buffer } from "buffer";
 import type { BankAccount, Quote } from "../types";
-import { SUPPORTED_ASSETS as SUPPORTED_SWAP_ASSETS, parseUnits, formatUnits } from "../lib/assets";
+import { SUPPORTED_ASSETS as SUPPORTED_SWAP_ASSETS, assetByCode, parseUnits, formatUnits } from "../lib/assets";
 import { addBank, loadBanks } from "../lib/bankVault";
 
 const buf = (u8: Uint8Array): Buffer => Buffer.from(u8);
@@ -86,6 +86,12 @@ export default function SwapPage() {
   const [verifyingBvn, setVerifyingBvn] = useState(false);
 
   const proving = swapProof.status === "fetching-path" || swapProof.status === "loading-circuit" || swapProof.status === "generating";
+
+  const selectedSwapAsset = assetByCode(assetType);
+  const shieldedSwapTotal = session.notes
+    .filter((n) => (n.asset || "XLM") === assetType)
+    .reduce((sum, n) => sum + BigInt(n.amount), 0n);
+  const shieldedSwapBalance = formatUnits(shieldedSwapTotal, selectedSwapAsset?.decimals ?? 7, 4);
 
   useEffect(() => {
     if (session.email) {
@@ -180,7 +186,7 @@ export default function SwapPage() {
       return;
     }
     if (!session.secretSalt || !session.merkleRoot) {
-      setActionError("Missing attestation â€” re-onboard.");
+      setActionError("Missing attestation — re-onboard.");
       return;
     }
     if (!selectedBankId) {
@@ -320,6 +326,7 @@ export default function SwapPage() {
           <div className="space-y-1.5">
             <div className="flex justify-between items-center px-1">
               <span className="text-xs text-white/50 font-medium uppercase tracking-wider">You Sell</span>
+              <span className="text-[11px] text-white/35">Shielded: {shieldedSwapBalance} {assetType}</span>
             </div>
             <div className="flex bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-2 focus-within:border-indigo-400/50 transition-all shadow-lg">
               <input
@@ -330,8 +337,9 @@ export default function SwapPage() {
               <select
                 className="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white font-semibold outline-none cursor-pointer hover:bg-white/20 transition-colors"
                 value={assetType} onChange={(e) => setAssetType(e.target.value)}
-              />
+              >
                 {SUPPORTED_SWAP_ASSETS.map((a) => <option key={a.code} value={a.code} className="bg-zinc-900">{a.code} - {a.name}</option>)}
+              </select>
             </div>
           </div>
 
@@ -343,7 +351,7 @@ export default function SwapPage() {
             </div>
             <div className="flex bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 transition-all opacity-80 shadow-lg">
               <span className="w-full bg-transparent text-2xl outline-none text-white font-medium">
-                {quote ? `â‚¦${quote.nairaAmount.toLocaleString()}` : "â‚¦0.00"}
+                {quote ? `₦${quote.nairaAmount.toLocaleString()}` : "₦0.00"}
               </span>
               <span className="px-3 py-1 text-white/60 font-semibold text-lg">NGN</span>
             </div>
@@ -353,7 +361,7 @@ export default function SwapPage() {
               </p>
             )}
             {quote && quote.requireBvn && !session.bvnVerified && (
-              <p className="text-xs text-amber-400/80 px-1 pt-1">âš ï¸ This amount requires Tier 2 Identity Verification (BVN).</p>
+              <p className="text-xs text-amber-400/80 px-1 pt-1">⚠️ This amount requires Tier 2 Identity Verification (BVN).</p>
             )}
           </div>
 
@@ -478,7 +486,7 @@ export default function SwapPage() {
         </motion.div>
       </div>
 
-      {/* â”€â”€ BVN Upgrade Modal â”€â”€ */}
+      {/* ── BVN Upgrade Modal ── */}
       <AnimatePresence>
         {showBvnModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -496,7 +504,7 @@ export default function SwapPage() {
         )}
       </AnimatePresence>
 
-      {/* â”€â”€ Cryptographic ZK Proof Modal â”€â”€ */}
+      {/* ── Cryptographic ZK Proof Modal ── */}
       <AnimatePresence>
         {proving && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">

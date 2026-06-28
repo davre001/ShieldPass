@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { SmartAccountWalletClient } from '@shieldpass/sdk/dist/smartAccount'
 import type { ShieldedIdentity } from '@shieldpass/sdk/dist/identity'
@@ -74,6 +74,10 @@ const SessionCtx = createContext<Session | null>(null)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>(loadPersisted)
+  // Notes that already existed when this provider mounted (i.e. survived a page reload).
+  // Only THESE need auto-retry — notes added during this session are handled by
+  // proveAndConfirm (fire-and-forget) and must NOT be retried concurrently.
+  const initialNoteIndices = useRef(new Set(loadPersisted().notes.map(n => n.leafIndex)))
 
   // Reconnect the wallet client on page reload — silent, no WebAuthn prompt.
   // Identity (shielded keys) is NOT rehydrated here; it is re-derived from PIN
@@ -93,8 +97,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // On mount, retry any notes that never landed on-chain (browser closed mid-proof).
   // Re-runs when new notes are added (length change), but NOT when confirmed flips
   // (avoids an infinite loop of re-triggering after marking notes confirmed).
+  // Only retries notes that existed BEFORE this session started — notes added during
+  // this session are being proved by proveAndConfirm (fire-and-forget) and must not
+  // be retried concurrently to avoid duplicate confirms.
   useEffect(() => {
-    const unconfirmed = state.notes.filter(n => n.confirmed !== true)
+    const unconfirmed = state.notes.filter(
+      n => n.confirmed !== true && initialNoteIndices.current.has(n.leafIndex)
+    )
     if (unconfirmed.length === 0) return
     let cancelled = false
     import('./useInsertProof').then(({ retryPendingProofs }) => {

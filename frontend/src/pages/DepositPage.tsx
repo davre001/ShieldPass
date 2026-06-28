@@ -11,6 +11,7 @@ import { useInsertProof } from "../lib/useInsertProof";
 import ShieldedBalance from "../components/ShieldedBalance";
 import ErrorNotice from "../components/ErrorNotice";
 import { SUPPORTED_ASSETS, assetByCode, formatUnits, parseUnits } from "../lib/assets";
+import { useWalletBalance } from "../lib/useWalletBalance";
 
 const buf = (u8: Uint8Array): Buffer => Buffer.from(u8);
 
@@ -45,6 +46,15 @@ export default function DepositPage() {
 
   const shieldedAssets = Array.from(new Set(session.notes.map((n) => n.asset || "XLM")));
   const selectedAsset = assetByCode(assetCode) ?? SUPPORTED_ASSETS[0];
+
+  const { balance: walletBalance, loading: walletLoading } = useWalletBalance(
+    mode === "shield" ? assetCode : "",
+    session.address,
+  );
+  const shieldedTotal = session.notes
+    .filter((n) => (n.asset || "XLM") === assetCode)
+    .reduce((sum, n) => sum + BigInt(n.amount), 0n);
+  const shieldedBalanceStr = formatUnits(shieldedTotal, selectedAsset?.decimals ?? 7, 4);
 
   function switchMode(next: Mode) {
     if (busy) return;
@@ -202,9 +212,20 @@ export default function DepositPage() {
           </div>
 
           <div>
-            <label className="text-white/40 text-xs font-mono tracking-wider uppercase">
-              Amount ({selectedAsset?.code ?? assetCode})
-            </label>
+            <div className="flex items-baseline justify-between">
+              <label className="text-white/40 text-xs font-mono tracking-wider uppercase">
+                Amount ({selectedAsset?.code ?? assetCode})
+              </label>
+              <span className="text-[11px] text-white/35">
+                {isShield
+                  ? walletLoading
+                    ? "Loading balance…"
+                    : walletBalance != null
+                    ? `Wallet: ${walletBalance} ${assetCode}`
+                    : null
+                  : `Shielded: ${shieldedBalanceStr} ${assetCode}`}
+              </span>
+            </div>
             <input
               type="number" min="0" inputMode="decimal" value={amount}
               onChange={(e) => setAmount(e.target.value)} placeholder="0"

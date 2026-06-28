@@ -100,6 +100,26 @@ export class SmartAccountWalletClient {
    * `args` keys must match the contract function's parameter names, with values in the contract
    * client's native form (Address as a string, i128 as a bigint, BytesN<32> as a 32-byte Buffer).
    */
+  /**
+   * Transfer tokens from the connected smart wallet to a recipient.
+   * Uses the kit's native XDR-level transfer path instead of contract.Client.from(),
+   * which fails on native SACs (XLM, etc.) because they have no uploadable Wasm.
+   *
+   * @param tokenContract - SAC address for the token
+   * @param recipient     - Destination address (G... or C...)
+   * @param amountStroops - Amount in the token's base unit (1 XLM = 10_000_000 stroops)
+   */
+  async transferToken(
+    tokenContract: string,
+    recipient: string,
+    amountStroops: bigint,
+  ): Promise<InvokeResult> {
+    // kit.transfer expects amount in whole-token units (e.g. 10.5 for 10.5 XLM)
+    const result = await this.kit.transfer(tokenContract, recipient, Number(amountStroops) / 10_000_000);
+    if (!result.success) throw new Error(result.error || 'Transfer failed.');
+    return { hash: result.hash, result: undefined };
+  }
+
   async invoke(contractId: string, method: string, args: Record<string, unknown>): Promise<InvokeResult> {
     const client = await contract.Client.from({
       contractId,
