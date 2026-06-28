@@ -5,7 +5,8 @@ import { api } from "../lib/api";
 import { useSession } from "../lib/session";
 import { makeWallet } from "../lib/smartAccount";
 import { humanizeError } from "@shieldpass/sdk/dist/errors";
-import { unlockIdentityAndVault } from "../lib/authCeremony";
+import { deriveSeedFromPassword, deriveIdentityFromSeed } from "../lib/shieldedKey";
+import { unlockBankVault } from "../lib/bankVault";
 import type { ShieldedIdentity } from "@shieldpass/sdk/dist/identity";
 import { proveAndConfirm } from "../lib/useInsertProof";
 
@@ -65,8 +66,10 @@ export default function OnboardingPage() {
         await wallet.connectWallet(check.passkeyKeyId, check.smartWalletAddress); // Prompts Face ID / Touch ID
         credentialId = check.passkeyKeyId;
         address = check.smartWalletAddress;
-        const { identity: recoveredIdentity } = await unlockIdentityAndVault(email, credentialId);
-        identity = recoveredIdentity; // same identity re-derived
+        // Re-derive shielded identity from PIN — no second passkey prompt.
+        const seed = await deriveSeedFromPassword(pin, email);
+        identity = deriveIdentityFromSeed(seed);
+        await unlockBankVault(seed, email);
 
         const reissue = await api.reissueSalt({ email, pin });
         secretSalt = reissue.secretSalt;
@@ -79,10 +82,12 @@ export default function OnboardingPage() {
         const res = await wallet.createWallet("ShieldPass", email);
         credentialId = res.credentialId;
         address = res.contractId;
-        const { identity: createdIdentity } = await unlockIdentityAndVault(email, credentialId);
-        identity = createdIdentity;
-
         // publish the shielded identity so others can send by email; faucet note is owned by us.
+        // Derive shielded identity from PIN — one passkey prompt total (just createWallet above).
+        const seed = await deriveSeedFromPassword(pin, email);
+        identity = deriveIdentityFromSeed(seed);
+        await unlockBankVault(seed, email);
+
         const linkRes = await api.linkWallet({
           email, pin, smartWalletAddress: res.contractId, passkeyKeyId: res.credentialId,
           shieldedOwner: identity.owner.toString(), shieldedEncPub: toHex(identity.encPublic), shieldedAddress: identity.address,

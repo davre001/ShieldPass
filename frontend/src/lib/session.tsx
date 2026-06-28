@@ -33,6 +33,8 @@ export interface Session extends SessionState {
   set: (patch: Partial<SessionState>) => void
   addNote: (note: ShieldedNote) => boolean // functional append; dedupes by randomness; returns true if added
   reset: () => void
+  /** Re-derive shielded identity from PIN after a page reload (no passkey prompt). */
+  unlockIdentityWithPin: (pin: string) => Promise<void>
 }
 
 const EMPTY: SessionState = {
@@ -71,27 +73,15 @@ const SessionCtx = createContext<Session | null>(null)
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>(loadPersisted)
 
-  // Re-hydrate + reconnect the wallet on page reload if a credentialId exists. Binding the kit to
-  // the stored credential/contract is silent (no WebAuthn prompt) — the prompt happens at signing.
+  // Reconnect the wallet client on page reload — silent, no WebAuthn prompt.
+  // Identity (shielded keys) is NOT rehydrated here; it is re-derived from PIN
+  // when the user next logs in or explicitly unlocks via unlockIdentityWithPin().
   useEffect(() => {
     if (state.credentialId && !state.wallet) {
       import('./smartAccount').then(({ makeWallet }) => {
         makeWallet().then(async w => {
           try { await w.connectWallet(state.credentialId, state.address ?? undefined) }
           catch (e) { console.error('[session] reconnect failed:', e) }
-          import('./shieldedKey').then(async ({ deriveSeed, deriveIdentityFromSeed }) => {
-            try {
-              const seed = await deriveSeed({ kind: 'passkey', credentialId: state.credentialId });
-              const identity = deriveIdentityFromSeed(seed);
-              if (state.email) {
-                const { unlockBankVault } = await import('./bankVault');
-                await unlockBankVault(seed, state.email);
-              }
-              setState(s => { const next = { ...s, identity }; savePersisted(next); return next; })
-            } catch (e) {
-              console.warn('[session] identity rehydrate failed:', e)
-            }
-          }).catch(console.error)
           setState(s => { const next = { ...s, wallet: w }; savePersisted(next); return next; })
         }).catch(console.error)
       }).catch(console.error)
@@ -114,6 +104,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return added
     },
     reset: () => { try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ } lockBankVault(); setState(EMPTY) },
+    unlockIdentityWithPin: async (pin: string) => {
+      const email = state.email
+      if (!email) return
+      const { deriveSeedFromPassword, deriveIdentityFromSeed } = await import('./shieldedKey')
+      const { unlockBankVault } = await import('./bankVault')
+      const seed = await deriveSeedFromPassword(pin, email)
+      const identity = deriveIdentityFromSeed(seed)
+      await unlockBankVault(seed, email)
+      setState(s => { const next = { ...s, identity }; savePersisted(next); return next })
+    },
   }
   return <SessionCtx.Provider value={value}>{children}</SessionCtx.Provider>
 }

@@ -27,7 +27,7 @@ services:
       cd SDK && npm install --include=dev --no-audit --no-fund && npx tsc &&
       cp ../frontend/public/reusable_kyc.json dist/reusable_kyc.json &&
       cd ../backend && npm install --include=dev --no-audit --no-fund && npx prisma generate &&
-      npx prisma db push && npm run build
+      npx prisma db push --accept-data-loss && npm run build
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_VERSION
