@@ -7,7 +7,7 @@ const RPC_URL = import.meta.env.VITE_RPC_URL || "https://soroban-testnet.stellar
  * Fetches the on-chain (public) wallet balance for a given asset and address.
  * Returns null while loading or if the fetch fails.
  */
-export function useWalletBalance(assetCode: string, address: string | undefined) {
+export function useWalletBalance(assetCode: string, address: string | null | undefined) {
   const [balance, setBalance] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
