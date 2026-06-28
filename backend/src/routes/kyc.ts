@@ -12,7 +12,7 @@ const issuer = new TrustedIssuer();
 
 // Faucet seed is configurable (no hardcoded amount). Change FAUCET_NOTE_AMOUNT /
 // FAUCET_NOTE_ASSET in the backend env to adjust the onboarding seed someday.
-const FAUCET_NOTE_AMOUNT = BigInt(process.env.FAUCET_NOTE_AMOUNT || '500');
+const FAUCET_NOTE_AMOUNT = BigInt(process.env.FAUCET_NOTE_AMOUNT || '5000000000'); // 500 XLM in stroops (7 decimals)
 const FAUCET_NOTE_ASSET = process.env.FAUCET_NOTE_ASSET || 'XLM';
 
 // Re-issue a compliance leaf from the user's current Tier flags and persist it.
