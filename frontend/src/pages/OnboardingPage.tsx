@@ -101,10 +101,14 @@ export default function OnboardingPage() {
             randomness: linkRes.faucetNote.randomness,
             leafIndex: linkRes.faucetNote.leafIndex,
             compliance: linkRes.faucetNote.compliance,
+            confirmed: false, // will flip to true once the proof lands on-chain
           };
           // Generate and submit the merkle_insert proof in the browser (fire-and-forget).
-          // The note is already saved above; on-chain confirmation happens asynchronously.
-          proveAndConfirm(linkRes.faucetNote.leafIndex, linkRes.faucetNote.circuitInput)
+          // If the browser closes mid-proof, the session auto-retry effect will pick it
+          // up on the next page load via /tree/retry/:index.
+          const faucetIndex = linkRes.faucetNote.leafIndex;
+          proveAndConfirm(faucetIndex, linkRes.faucetNote.circuitInput)
+            .then(() => session.confirmNote(faucetIndex))
             .catch((err) => console.warn('[onboarding] faucet proof failed:', err));
         }
       }

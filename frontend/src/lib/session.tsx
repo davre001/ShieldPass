@@ -11,6 +11,7 @@ export interface ShieldedNote {
   randomness: string   // per-note uniqueness; needed (with the shielded key) to spend
   leafIndex: number
   compliance: { hardware_attested: string; bvn_verified: string; good_standing: string }
+  confirmed?: boolean  // undefined = unknown (legacy), false = proof pending, true = on-chain
 }
 
 interface SessionState {
@@ -32,6 +33,7 @@ export interface Session extends SessionState {
   onboarded: boolean
   set: (patch: Partial<SessionState>) => void
   addNote: (note: ShieldedNote) => boolean // functional append; dedupes by randomness; returns true if added
+  confirmNote: (leafIndex: number) => void  // mark a note as on-chain confirmed
   reset: () => void
   /** Re-derive shielded identity from PIN after a page reload (no passkey prompt). */
   unlockIdentityWithPin: (pin: string) => Promise<void>
@@ -88,6 +90,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [state.credentialId, state.wallet, state.address])
 
+  // On mount, retry any notes that never landed on-chain (browser closed mid-proof).
+  // Re-runs when new notes are added (length change), but NOT when confirmed flips
+  // (avoids an infinite loop of re-triggering after marking notes confirmed).
+  useEffect(() => {
+    const unconfirmed = state.notes.filter(n => n.confirmed !== true)
+    if (unconfirmed.length === 0) return
+    let cancelled = false
+    import('./useInsertProof').then(({ retryPendingProofs }) => {
+      retryPendingProofs(unconfirmed).then(confirmedIndices => {
+        if (cancelled || confirmedIndices.length === 0) return
+        setState(s => {
+          const next = { ...s, notes: s.notes.map(n =>
+            confirmedIndices.includes(n.leafIndex) ? { ...n, confirmed: true } : n
+          )}
+          savePersisted(next)
+          return next
+        })
+      }).catch(() => {})
+    }).catch(() => {})
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.notes.length])
+
   const value: Session = {
     ...state,
     onboarded: !!(state.secretSalt && state.address),
@@ -102,6 +127,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return next
       })
       return added
+    },
+    confirmNote: (leafIndex: number) => {
+      setState(s => {
+        const next = { ...s, notes: s.notes.map(n => n.leafIndex === leafIndex ? { ...n, confirmed: true } : n) }
+        savePersisted(next)
+        return next
+      })
     },
     reset: () => { try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ } lockBankVault(); setState(EMPTY) },
     unlockIdentityWithPin: async (pin: string) => {

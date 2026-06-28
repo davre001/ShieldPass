@@ -93,6 +93,28 @@ router.get('/index/:commitment', async (req, res) => {
     }
 });
 
+/**
+ * GET /tree/retry/:index
+ * Lets the browser recover a stuck pending proof without re-calling /tree/assign.
+ * Returns the stored circuitInput if the leaf is still pending.
+ * Returns { status: 'confirmed' } if it already landed on-chain.
+ * Returns 404 if the index was rolled back by the cleanup job (treat as "re-issue needed").
+ */
+router.get('/retry/:index', async (req, res) => {
+    const index = Number(req.params.index);
+    if (!Number.isInteger(index) || index < 0) return res.status(400).json({ error: 'invalid index' });
+    try {
+        const { prisma } = await import('../db');
+        const leaf = await prisma.treeLeaf.findUnique({ where: { index } });
+        if (!leaf) return res.status(404).json({ error: 'leaf not found (may have been rolled back)' });
+        if (leaf.status === 'confirmed') return res.json({ status: 'confirmed' });
+        if (!leaf.circuitInput) return res.status(409).json({ error: 'no circuitInput stored for this leaf' });
+        res.json({ index, status: 'pending', circuitInput: leaf.circuitInput });
+    } catch (e: any) {
+        res.status(500).json({ error: e?.message || 'retry lookup failed' });
+    }
+});
+
 // GET /tree/pending-count — monitoring: how many leaves are currently awaiting proof submission.
 router.get('/pending-count', async (_req, res) => {
     try {

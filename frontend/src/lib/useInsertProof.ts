@@ -19,20 +19,26 @@
 import { api } from './api';
 
 
-// Module-level cache so circuit files are only downloaded once per page load.
-let cachedWasm: Uint8Array | null = null;
-let cachedZkey: Uint8Array | null = null;
+// Cache the raw ArrayBuffers. Uint8Arrays backed by transferred ArrayBuffers become
+// neutered (byteLength = 0) after a Web Worker transfer, so we store the originals
+// and slice a fresh copy for each worker call (slice = O(n) copy, not zero-copy).
+let cachedWasmBuf: ArrayBuffer | null = null;
+let cachedZkeyBuf: ArrayBuffer | null = null;
 
 async function loadCircuits(): Promise<{ wasmBytes: Uint8Array; zkeyBytes: Uint8Array }> {
-    if (!cachedWasm || !cachedZkey) {
+    if (!cachedWasmBuf || !cachedZkeyBuf) {
         const [wasmBuf, zkeyBuf] = await Promise.all([
             fetch('/merkle_insert.wasm').then((r) => r.arrayBuffer()),
             fetch('/merkle_insert_final.zkey').then((r) => r.arrayBuffer()),
         ]);
-        cachedWasm = new Uint8Array(wasmBuf);
-        cachedZkey = new Uint8Array(zkeyBuf);
+        cachedWasmBuf = wasmBuf;
+        cachedZkeyBuf = zkeyBuf;
     }
-    return { wasmBytes: cachedWasm!, zkeyBytes: cachedZkey! };
+    // Each call gets a fresh Uint8Array whose buffer can be safely transferred.
+    return {
+        wasmBytes: new Uint8Array(cachedWasmBuf!.slice(0)),
+        zkeyBytes: new Uint8Array(cachedZkeyBuf!.slice(0)),
+    };
 }
 
 function runProofInWorker(
@@ -90,6 +96,57 @@ export async function proveAndConfirm(
     } catch (confirmErr: any) {
         console.warn('[proveAndConfirm] confirm failed (leaf still reserved):', confirmErr?.message);
     }
+}
+
+/**
+ * On page load, check each unconfirmed note against the backend and re-prove
+ * any that are still pending. Returns the leaf indices that are now confirmed.
+ * Runs proofs sequentially to avoid OOM from concurrent snarkjs workers.
+ */
+export async function retryPendingProofs(
+    notes: { leafIndex: number; confirmed?: boolean }[],
+): Promise<number[]> {
+    const unconfirmed = notes.filter(n => n.confirmed !== true);
+    if (unconfirmed.length === 0) return [];
+
+    const confirmedIndices: number[] = [];
+
+    for (const note of unconfirmed) {
+        try {
+            const res = await api.treeRetry(note.leafIndex);
+            if (res.status === 'confirmed') {
+                confirmedIndices.push(note.leafIndex);
+                continue;
+            }
+            // Still pending — re-prove
+            if ('circuitInput' in res && res.circuitInput) {
+                const { wasmBytes, zkeyBytes } = await loadCircuits();
+                let bundle: any;
+                try {
+                    ({ bundle } = await runProofInWorker(res.circuitInput, wasmBytes, zkeyBytes));
+                } catch {
+                    continue; // proof failed — will retry next page load
+                }
+                try {
+                    await api.treeConfirm(note.leafIndex, {
+                        proof_a: Array.from(bundle.proof.a),
+                        proof_b: Array.from(bundle.proof.b),
+                        proof_c: Array.from(bundle.proof.c),
+                        public_signals: bundle.publicSignals.map((s: Uint8Array) => Array.from(s)),
+                    });
+                    confirmedIndices.push(note.leafIndex);
+                } catch {
+                    // confirm failed — will retry next page load
+                }
+            }
+        } catch {
+            // 404 = leaf was rolled back by cleanup job. Treat as confirmed so we
+            // stop retrying it — the user will get a fresh note on next onboarding.
+            confirmedIndices.push(note.leafIndex);
+        }
+    }
+
+    return confirmedIndices;
 }
 
 export function useInsertProof() {

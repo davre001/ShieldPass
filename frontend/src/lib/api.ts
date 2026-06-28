@@ -66,6 +66,10 @@ export const api = {
     proof_a: number[]; proof_b: number[]; proof_c: number[]; public_signals: number[][];
   }) =>
     request<{ txHash?: string }>("/tree/confirm", { method: "POST", body: JSON.stringify({ index, ...proof }) }),
+  // Retry a stuck pending proof: returns circuitInput if still pending, or { status: 'confirmed' }
+  treeRetry: (index: number) =>
+    request<{ status: 'confirmed' } | { status: 'pending'; index: number; circuitInput: Record<string, unknown> }>(
+      `/tree/retry/${index}`),
 
   lookupShielded: (email: string) =>
     request<{ owner: string; encPub: string; address: string | null }>(`/notes/identity/${encodeURIComponent(email)}`),

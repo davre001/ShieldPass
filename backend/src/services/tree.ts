@@ -67,6 +67,32 @@ class TreeService {
         return row ? row.index : null;
     }
 
+    // ── Chain sync guard ─────────────────────────────────────────────────────
+
+    /**
+     * Verify the in-memory tree's nextIndex matches the on-chain contract.
+     * If they diverge (e.g. DB was cleared without redeploying the contract),
+     * throw immediately so the caller gets a clear error instead of submitting
+     * a proof built against the wrong old_root.
+     */
+    private async assertSyncedWithChain(): Promise<void> {
+        if (!CONTRACT_ID || !RELAYER_SECRET) return;
+        try {
+            const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
+            const chainIndex = await pool.nextIndex();
+            const dbIndex = this.tree.nextIndex;
+            if (chainIndex !== dbIndex) {
+                throw new Error(
+                    `[tree] DIVERGED: DB has ${dbIndex} leaves, chain has ${chainIndex}. ` +
+                    `Redeploy the contract to reset on-chain state, then clear the DB.`
+                );
+            }
+        } catch (e: any) {
+            if (e.message?.includes('DIVERGED')) throw e;
+            console.warn('[tree] chain sync check skipped (RPC unreachable?):', e.message);
+        }
+    }
+
     // ── Client-side proving flow ──────────────────────────────────────────────
 
     /**
@@ -82,10 +108,11 @@ class TreeService {
     }> {
         return this.serialize(async () => {
             await this.ensureLoaded();
+            await this.assertSyncedWithChain();
             const index = this.tree.nextIndex;
             const circuitInput = buildInsertInput(this.tree, commitment); // mutates tree
             await prisma.treeLeaf.create({
-                data: { index, commitment: commitment.toString(), status: 'pending', assignedAt: new Date() },
+                data: { index, commitment: commitment.toString(), status: 'pending', assignedAt: new Date(), circuitInput: circuitInput as any },
             });
             console.log(`[tree/assign] index=${index} commitment=${commitment}`);
             return { index, circuitInput };
@@ -139,20 +166,35 @@ class TreeService {
     // ── Background cleanup ────────────────────────────────────────────────────
 
     /**
-     * Log any pending leaves that are older than PENDING_TTL_MS. These represent
-     * browsers that were assigned a circuit input but never submitted the proof
-     * (e.g. user closed the tab mid-proof). Does not mutate anything — just alerts
-     * so an operator can investigate if needed.
+     * Roll back any pending leaves that have been stuck past PENDING_TTL_MS.
+     *
+     * When a browser closes mid-proof the DB has a pending leaf but the chain does
+     * not. That means DB.nextIndex > chain.nextIndex, which blocks ALL subsequent
+     * inserts (assertSyncedWithChain throws). Without a rollback the tree is frozen
+     * until the original browser comes back and retries.
+     *
+     * Fix: delete the expired pending rows from the DB and force a tree rebuild.
+     * After the rebuild nextIndex matches the chain again and new inserts work.
+     * The original user will get a 404 on /tree/retry and their note is quietly
+     * re-issued on their next onboarding/login attempt.
      */
     async cleanupExpiredPending(): Promise<void> {
         const cutoff = new Date(Date.now() - PENDING_TTL_MS);
         const stale = await prisma.treeLeaf.findMany({
             where: { status: 'pending', assignedAt: { lt: cutoff } },
         });
-        if (stale.length > 0) {
-            console.warn(`[tree/cleanup] ${stale.length} pending leaf(ves) older than 2 min:`,
-                stale.map((l) => `index=${l.index}`).join(', '));
-        }
+        if (stale.length === 0) return;
+
+        const indices = stale.map((l) => l.index);
+        console.warn(`[tree/cleanup] rolling back ${stale.length} expired pending leaf(ves):`,
+            indices.map((i) => `index=${i}`).join(', '));
+
+        await prisma.treeLeaf.deleteMany({ where: { index: { in: indices } } });
+
+        // Force a full rebuild on the next operation so the in-memory tree drops
+        // these leaves and nextIndex falls back in line with the chain.
+        this.loaded = false;
+        console.log('[tree/cleanup] in-memory tree invalidated — will rebuild on next request');
     }
 }
 
