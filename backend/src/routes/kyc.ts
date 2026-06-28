@@ -75,10 +75,12 @@ router.post('/link-wallet', async (req, res) => {
       const compliance = { hardware_attested: 1n, bvn_verified: 0n, good_standing: 1n };
       const commitment = noteCommitment(noteAmount, BigInt(shieldedOwner), randomness, compliance);
 
-      // Queue on-chain (faucet_seed) + advance the tree trustlessly (insert). No public transfer.
-      const { index } = await treeService.seedNote(commitment);
+      // Authorize on-chain (faucet_seed, relayer-signed) + reserve tree index.
+      // prove() runs in the browser via /tree/confirm — not on this server.
+      const { index, circuitInput } = await treeService.faucetAssign(commitment);
 
       // The client keeps `randomness` (with their shielded key) to spend the note later.
+      // `circuitInput` is passed back so the browser can generate the merkle_insert proof.
       faucetNote = {
         amount: noteAmount.toString(),
         randomness: randomness.toString(),
@@ -86,6 +88,7 @@ router.post('/link-wallet', async (req, res) => {
         compliance: { hardware_attested: '1', bvn_verified: '0', good_standing: '1' },
         leafIndex: index,
         commitment: commitment.toString(),
+        circuitInput,
       };
       console.log(`[kyc/link-wallet] seeded ${noteAmount} ${FAUCET_NOTE_ASSET} owner-based ZK Note at index ${index}.`);
       await notify(email, 'FAUCET', `Welcome bonus received`, { amount: noteAmount.toString(), asset: FAUCET_NOTE_ASSET });

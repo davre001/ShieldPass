@@ -57,6 +57,41 @@ function runProofInWorker(
     });
 }
 
+/**
+ * Run prove → confirm for a leaf that was already assigned by the server.
+ * Use this when the backend returns a circuitInput directly (e.g. faucet notes)
+ * so we skip the /tree/assign round-trip.
+ */
+export async function proveAndConfirm(
+    index: number,
+    circuitInput: Record<string, unknown>,
+    setStatus?: (s: string) => void,
+): Promise<void> {
+    setStatus?.('Loading ZK circuit…');
+    const { wasmBytes, zkeyBytes } = await loadCircuits();
+
+    setStatus?.('Generating proof in your browser…');
+    let bundle: any;
+    try {
+        ({ bundle } = await runProofInWorker(circuitInput, wasmBytes, zkeyBytes));
+    } catch (proveErr: any) {
+        console.warn('[proveAndConfirm] proof generation failed (leaf already reserved):', proveErr?.message);
+        return;
+    }
+
+    setStatus?.('Submitting proof…');
+    try {
+        await api.treeConfirm(index, {
+            proof_a: Array.from(bundle.proof.a),
+            proof_b: Array.from(bundle.proof.b),
+            proof_c: Array.from(bundle.proof.c),
+            public_signals: bundle.publicSignals.map((s: Uint8Array) => Array.from(s)),
+        });
+    } catch (confirmErr: any) {
+        console.warn('[proveAndConfirm] confirm failed (leaf still reserved):', confirmErr?.message);
+    }
+}
+
 export function useInsertProof() {
     /**
      * Run the full assign → prove → confirm flow for one commitment.

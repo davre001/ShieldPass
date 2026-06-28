@@ -1,7 +1,6 @@
-import path from 'path';
 import { Networks, Keypair } from '@stellar/stellar-sdk';
 import {
-    IncrementalMerkleTree, buildInsertInput, prove, ShieldedPoolClient, fieldToBytes32,
+    IncrementalMerkleTree, buildInsertInput, ShieldedPoolClient, fieldToBytes32,
 } from '@shieldpass/sdk';
 import { prisma } from '../db';
 
@@ -10,8 +9,6 @@ const RELAYER_SECRET = process.env.STELLAR_RELAYER_SECRET || '';
 const RPC_URL = process.env.STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org';
 const NETWORK = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
 
-const INSERT_WASM = path.join(__dirname, '../../circuits/merkle_insert.wasm');
-const INSERT_ZKEY = path.join(__dirname, '../../circuits/merkle_insert_final.zkey');
 const DEPTH = 20;
 
 // Pending leaves expire after 2 minutes — if the browser closed mid-proof.
@@ -124,51 +121,19 @@ class TreeService {
         return { txHash };
     }
 
-    // ── Faucet seed (server-side only — no browser involved at signup) ────────
+    // ── Faucet assign (client-side proving) ──────────────────────────────────
 
     /**
-     * Seed a faucet note: queue the commitment on-chain (faucet_seed, admin) and then
-     * advance the tree with a server-generated proof. Runs server-side because there
-     * is no browser present at new-user signup time. This is a low-frequency path
-     * (once per new user), not a concurrent hot path, so the memory cost is acceptable.
+     * Authorize a faucet note on-chain (relayer-signed faucet_seed call), then
+     * reserve a tree index and return the circuit input the browser needs to prove.
+     * prove() never runs server-side — the browser does it via the normal confirm flow.
      */
-    async seedNote(commitment: bigint): Promise<{ index: number; root: string }> {
-        return this.serialize(async () => {
-            await this.ensureLoaded();
-            if (CONTRACT_ID && RELAYER_SECRET) {
-                const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
-                await pool.faucetSeed(fieldToBytes32(commitment), Keypair.fromSecret(RELAYER_SECRET));
-            }
-
-            const index = this.tree.nextIndex;
-            const input = buildInsertInput(this.tree, commitment); // mutates tree
-            const root = this.tree.root().toString();
-            await prisma.treeLeaf.create({
-                data: { index, commitment: commitment.toString(), status: 'confirmed' },
-            });
-
-            // Server-side prove — only path where this runs (seedNote = signup faucet).
-            if (CONTRACT_ID && RELAYER_SECRET) {
-                // Fire-and-forget so signup doesn't block on proof time.
-                setImmediate(() => this._submitSeedProof(input, commitment, index).catch(() => {}));
-            }
-
-            return { index, root };
-        });
-    }
-
-    private async _submitSeedProof(input: unknown, commitment: bigint, index: number, attempt = 1): Promise<void> {
-        try {
-            const { proof, publicSignals } = await prove(input as any, INSERT_WASM, INSERT_ZKEY);
+    async faucetAssign(commitment: bigint): Promise<{ index: number; circuitInput: Record<string, unknown> }> {
+        if (CONTRACT_ID && RELAYER_SECRET) {
             const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
-            const txHash = await pool.insert(proof, publicSignals, Keypair.fromSecret(RELAYER_SECRET));
-            console.log(`[tree/seedNote] insert ok index=${index} tx=${txHash}`);
-        } catch (err: any) {
-            console.error(`[tree/seedNote] insert attempt ${attempt} FAILED index=${index}:`, err?.message);
-            if (attempt < 3) {
-                setTimeout(() => this._submitSeedProof(input, commitment, index, attempt + 1).catch(() => {}), 15_000 * attempt);
-            }
+            await pool.faucetSeed(fieldToBytes32(commitment), Keypair.fromSecret(RELAYER_SECRET));
         }
+        return this.assignInsert(commitment);
     }
 
     // ── Background cleanup ────────────────────────────────────────────────────

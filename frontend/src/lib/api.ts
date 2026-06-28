@@ -23,6 +23,7 @@ export const api = {
       success: boolean; tier: number; secretSalt: string; merkleRoot: string; leafIndex: number;
       faucetNote?: {
         amount: string; randomness: string; asset: string; leafIndex: number; commitment: string;
+        circuitInput: Record<string, unknown>;
         compliance: { hardware_attested: string; bvn_verified: string; good_standing: string };
       };
     }>("/kyc/link-wallet", { method: "POST", body: JSON.stringify(input) }),

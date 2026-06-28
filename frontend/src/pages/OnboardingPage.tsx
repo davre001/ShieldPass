@@ -7,6 +7,7 @@ import { makeWallet } from "../lib/smartAccount";
 import { humanizeError } from "@shieldpass/sdk/dist/errors";
 import { unlockIdentityAndVault } from "../lib/authCeremony";
 import type { ShieldedIdentity } from "@shieldpass/sdk/dist/identity";
+import { proveAndConfirm } from "../lib/useInsertProof";
 
 import { AnimatedLayout } from "../components/ui/animated-characters-login-page";
 
@@ -96,6 +97,10 @@ export default function OnboardingPage() {
             leafIndex: linkRes.faucetNote.leafIndex,
             compliance: linkRes.faucetNote.compliance,
           };
+          // Generate and submit the merkle_insert proof in the browser (fire-and-forget).
+          // The note is already saved above; on-chain confirmation happens asynchronously.
+          proveAndConfirm(linkRes.faucetNote.leafIndex, linkRes.faucetNote.circuitInput)
+            .catch((err) => console.warn('[onboarding] faucet proof failed:', err));
         }
       }
 
