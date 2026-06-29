@@ -474,9 +474,15 @@ export default function SwapPage() {
             )}
           </div>
 
+          {!session.identity && (
+            <p className="text-amber-400/80 text-xs border border-amber-400/20 bg-amber-400/5 rounded-xl px-4 py-3">
+              Shielded key locked — <span className="text-amber-300 font-medium">log in</span> first to unlock it, then come back here.
+            </p>
+          )}
+
           <button
             onClick={() => handleSwap()}
-            disabled={swapping || !quote || !selectedBankId || quoteLoading || (session.onboarded && !session.wallet)}
+            disabled={swapping || !quote || !selectedBankId || quoteLoading || (session.onboarded && !session.wallet) || !session.identity}
             className="w-full font-semibold px-6 py-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:border-white/30 text-white shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {swapping ? "Executing Swap..." :

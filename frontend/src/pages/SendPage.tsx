@@ -382,9 +382,15 @@ export default function SendPage() {
                 )}
               </div>
 
+              {isShielded && !session.identity && (
+                <p className="text-amber-400/80 text-xs border border-amber-400/20 bg-amber-400/5 rounded-xl px-4 py-3">
+                  Shielded key locked — <span className="text-amber-300 font-medium">log in</span> first to unlock it, then come back here.
+                </p>
+              )}
+
               <button
                 onClick={handleSend}
-                disabled={busy || !amount || !recipient || (session.onboarded && !session.wallet)}
+                disabled={busy || !amount || !recipient || (session.onboarded && !session.wallet) || (isShielded && !session.identity)}
                 className="w-full py-3.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {busy ? (proving ? "Generating proof..." : status || "Sending...") : (isShielded ? "Send privately" : "Send")}
