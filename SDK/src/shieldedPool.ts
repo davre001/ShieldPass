@@ -56,7 +56,7 @@ export class ShieldedPoolClient {
     }
 
     /** Poll until a tx hash is confirmed on-chain (or throw on failure/timeout). */
-    async waitForLanding(hash: string, timeoutMs = 90_000): Promise<void> {
+    async waitForLanding(hash: string, timeoutMs = 180_000): Promise<void> {
         const deadline = Date.now() + timeoutMs;
         while (Date.now() < deadline) {
             const r = await this.server.getTransaction(hash);
@@ -140,7 +140,7 @@ export class ShieldedPoolClient {
             const info = await this.server.getAccount(kp.publicKey());
             const account = new Account(kp.publicKey(), info.sequenceNumber());
             let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
-                .addOperation(new Contract(this.contractId).call(method, ...args)).setTimeout(60).build();
+                .addOperation(new Contract(this.contractId).call(method, ...args)).setTimeout(300).build();
             const sim = await this.server.simulateTransaction(tx);
             if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[ShieldedPoolClient] ${method} sim failed: ${JSON.stringify(sim)}`);
             tx = rpc.assembleTransaction(tx, sim).build();

@@ -163,31 +163,61 @@ class TreeService {
     // ── Faucet assign (client-side proving) ──────────────────────────────────
 
     /**
-     * Authorize a faucet note on-chain (relayer-signed faucet_seed call), then
-     * reserve a tree index and return the circuit input the browser needs to prove.
+     * Reserve a tree index for a faucet note and return the circuit input the browser
+     * needs to prove. DB/tree only — NO on-chain I/O, so it never blocks sign-in.
      * prove() never runs server-side — the browser does it via the normal confirm flow.
      *
-     * faucet_seed registers the commitment without moving any XLM into the pool.
-     * We immediately follow up with a SAC transfer of the faucet amount from the
-     * relayer into the pool contract so that the user can actually unshield/spend it.
+     * The matching on-chain work (faucet_seed + pool funding) is settled separately by
+     * settleFaucetOnChain(), which the caller fires in the background after responding.
      */
     async faucetAssign(commitment: bigint): Promise<{ index: number; circuitInput: Record<string, unknown> }> {
-        if (CONTRACT_ID && RELAYER_SECRET) {
-            const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
-            const relayer = Keypair.fromSecret(RELAYER_SECRET);
-            await pool.faucetSeed(fieldToBytes32(commitment), relayer);
-
-            // Fund the pool so the faucet note is actually redeemable.
-            if (XLM_SAC_ADDRESS) {
-                const stellar = new StellarContractClient(RPC_URL, NETWORK, XLM_SAC_ADDRESS);
-                const fundHash = await stellar.fundWallet(XLM_SAC_ADDRESS, CONTRACT_ID, FAUCET_NOTE_AMOUNT, relayer);
-                await pool.waitForLanding(fundHash);
-                console.log(`[tree/faucet] funded pool ${FAUCET_NOTE_AMOUNT} stroops tx=${fundHash}`);
-            } else {
-                console.warn('[tree/faucet] XLM_SAC_ADDRESS not set — pool not funded, unshield will fail');
-            }
-        }
+        // Reserve the tree index + build the browser's circuit input FIRST (DB/tree
+        // only, no on-chain I/O) so sign-in returns in ~1-2s. The relayer's on-chain
+        // work (faucet_seed + pool funding) runs in the background while the browser
+        // generates its merkle_insert proof (~5-15s) — that proving window masks the
+        // testnet landing latency, so the browser's /tree/confirm insert sees the
+        // commitment already Pending by the time it submits.
         return this.assignInsert(commitment);
+    }
+
+    /**
+     * Background, off the HTTP critical path: settle a faucet note on-chain. The two
+     * relayer transactions are serialized via waitForLanding because they share one
+     * account sequence number — submitting both at once would collide (txBAD_SEQ).
+     *
+     *  1. faucet_seed(commitment) — registers the note commitment as Pending. This is
+     *     CHEAP: it only spends gas (a few stroops in fees), NOT the faucet amount. As
+     *     long as the relayer can pay fees, it lands. The browser's insert depends on
+     *     this, so it runs first.
+     *  2. fundWallet(pool, FAUCET_NOTE_AMOUNT) — backs the note with real XLM so it can
+     *     be unshielded (cashed out) later. This is only needed at cash-out time; it
+     *     never blocks the note's creation or private transfer. If the relayer is short
+     *     on XLM, the note still exists and is transferable — only unshield waits.
+     *
+     * Failure handling: if faucet_seed never lands, the browser's insert simulation
+     * fails, the pending leaf is rolled back by cleanupExpiredPending after 2 min (the
+     * tree stays consistent), and the user simply gets no note — they can re-link/login
+     * to retry. If it lands late, the browser's retryPendingProofs re-submits on reload.
+     */
+    async settleFaucetOnChain(commitment: bigint): Promise<void> {
+        if (!CONTRACT_ID || !RELAYER_SECRET) return;
+        const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
+        const relayer = Keypair.fromSecret(RELAYER_SECRET);
+
+        // 1. Register the commitment (gas only). faucetSeed waits for landing so the
+        //    pool-funding tx below gets a fresh sequence number off the same account.
+        await pool.faucetSeed(fieldToBytes32(commitment), relayer);
+        console.log(`[tree/faucet] faucet_seed landed for commitment=${commitment}`);
+
+        // 2. Back the note in the pool (only matters at unshield/cash-out time).
+        if (XLM_SAC_ADDRESS) {
+            const stellar = new StellarContractClient(RPC_URL, NETWORK, XLM_SAC_ADDRESS);
+            const fundHash = await stellar.fundWallet(XLM_SAC_ADDRESS, CONTRACT_ID, FAUCET_NOTE_AMOUNT, relayer);
+            await pool.waitForLanding(fundHash);
+            console.log(`[tree/faucet] funded pool ${FAUCET_NOTE_AMOUNT} stroops tx=${fundHash}`);
+        } else {
+            console.warn('[tree/faucet] XLM_SAC_ADDRESS not set — pool not funded, unshield will fail');
+        }
     }
 
     // ── Background cleanup ────────────────────────────────────────────────────

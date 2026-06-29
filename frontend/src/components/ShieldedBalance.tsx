@@ -14,6 +14,15 @@ export default function ShieldedBalance({ compact = false }: { compact?: boolean
     acc[code] = (acc[code] ?? 0n) + BigInt(note.amount);
     return acc;
   }, {});
+  // "Settling" = note is shown in the balance but its merkle_insert proof hasn't
+  // landed on-chain yet, so it isn't spendable. Tracked per-asset so we can flag
+  // exactly how much of the displayed total is still pending confirmation.
+  const settling = notes.reduce<Record<string, bigint>>((acc, note) => {
+    if (note.confirmed === true) return acc;
+    const code = note.asset || "XLM";
+    acc[code] = (acc[code] ?? 0n) + BigInt(note.amount);
+    return acc;
+  }, {});
   const rows = Object.entries(totals);
   const hasBalance = notes.length > 0;
 
@@ -32,11 +41,28 @@ export default function ShieldedBalance({ compact = false }: { compact?: boolean
         {hasBalance ? (
           <>
             <div className="space-y-1">
-              {rows.map(([asset, total]) => (
-                <div key={asset} className="text-white font-medium text-3xl tracking-tight">
-                  {formatUnits(total, assetByCode(asset)?.decimals ?? 7, 4)} <span className="text-white/50 text-xl">{asset}</span>
-                </div>
-              ))}
+              {rows.map(([asset, total]) => {
+                const decimals = assetByCode(asset)?.decimals ?? 7;
+                const pending = settling[asset] ?? 0n;
+                return (
+                  <div key={asset}>
+                    <div className="text-white font-medium text-3xl tracking-tight">
+                      {formatUnits(total, decimals, 4)} <span className="text-white/50 text-xl">{asset}</span>
+                    </div>
+                    {pending > 0n && (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400/70" />
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400" />
+                        </span>
+                        <span className="text-amber-300/80 text-xs font-mono">
+                          {formatUnits(pending, decimals, 4)} {asset} settling — not yet spendable
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             {!compact && (
               <p className="text-white/35 text-xs mt-2 leading-relaxed">
