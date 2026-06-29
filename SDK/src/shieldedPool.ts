@@ -142,6 +142,13 @@ export class ShieldedPoolClient {
         tx = rpc.assembleTransaction(tx, sim).build();
         tx.sign(kp);
         const sent = await this.server.sendTransaction(tx);
+        if (sent.status === 'ERROR') {
+            const detail = (sent as any).errorResult ? JSON.stringify((sent as any).errorResult) : 'unknown';
+            throw new Error(`[ShieldedPoolClient] sendTransaction rejected (${method}): ${detail}`);
+        }
+        if (sent.status === 'TRY_AGAIN_LATER') {
+            throw new Error(`[ShieldedPoolClient] sendTransaction overloaded (${method}) — retry`);
+        }
         return sent.hash;
     }
 
