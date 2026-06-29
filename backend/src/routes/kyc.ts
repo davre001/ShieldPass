@@ -54,8 +54,8 @@ router.post('/link-wallet', async (req, res) => {
     const leaf = await issueLeaf(user.id, true, false);
 
     // ON-CHAIN SEED: transfer real tokens (configured in SEED_TOKENS) into the new smart wallet.
-    // This runs best-effort — a failed seed never blocks onboarding.
-    seedWalletFromEnv(smartWalletAddress)
+    // Awaited before faucetAssign so both ops don't race on the relayer's sequence number.
+    await seedWalletFromEnv(smartWalletAddress)
       .then((results) => {
         for (const r of results) {
           if (r.status === 'funded') console.log(`[kyc/link-wallet] seeded ${r.tokenId} -> ${smartWalletAddress} tx:${r.hash}`);
