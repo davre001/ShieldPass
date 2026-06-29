@@ -1,0 +1,24 @@
+name: Relayer Daily Top-up
+
+on:
+  schedule:
+    - cron: '0 12 * * *'   # 12:00 UTC every day
+  workflow_dispatch:         # manual trigger for testing
+
+jobs:
+  topup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Top up relayer via friendbot
+        run: |
+          RELAYER="${{ vars.STELLAR_RELAYER_ADDRESS }}"
+
+          if [ -z "$RELAYER" ]; then
+            echo "STELLAR_RELAYER_ADDRESS variable not set — aborting."
+            exit 1
+          fi
+
+          echo "Topping up $RELAYER..."
+          RESPONSE=$(curl -sf "https://friendbot.stellar.org?addr=$RELAYER")
+          TX=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('hash','unknown'))")
+          echo "Top-up tx: $TX"

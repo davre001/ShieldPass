@@ -56,7 +56,7 @@ export class ShieldedPoolClient {
     }
 
     /** Poll until a tx hash is confirmed on-chain (or throw on failure/timeout). */
-    async waitForLanding(hash: string, timeoutMs = 30_000): Promise<void> {
+    async waitForLanding(hash: string, timeoutMs = 60_000): Promise<void> {
         const deadline = Date.now() + timeoutMs;
         while (Date.now() < deadline) {
             const r = await this.server.getTransaction(hash);
