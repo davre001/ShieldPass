@@ -17,6 +17,12 @@
  */
 
 import { api } from './api';
+import { assetByCode } from './assets';
+
+/** The shielded_pool contract id that holds a given asset's tree (undefined → default/XLM). */
+function poolForAsset(asset?: string): string | undefined {
+    return assetByCode(asset)?.poolContractId;
+}
 
 
 // Cache the raw ArrayBuffers. Uint8Arrays backed by transferred ArrayBuffers become
@@ -72,6 +78,7 @@ export async function proveAndConfirm(
     index: number,
     circuitInput: Record<string, unknown>,
     setStatus?: (s: string) => void,
+    pool?: string,
 ): Promise<void> {
     setStatus?.('Loading ZK circuit…');
     const { wasmBytes, zkeyBytes } = await loadCircuits();
@@ -92,7 +99,7 @@ export async function proveAndConfirm(
             proof_b: Array.from(bundle.proof.b),
             proof_c: Array.from(bundle.proof.c),
             public_signals: bundle.publicSignals.map((s: Uint8Array) => Array.from(s)),
-        });
+        }, pool);
     } catch (confirmErr: any) {
         console.warn('[proveAndConfirm] confirm failed (leaf still reserved):', confirmErr?.message);
     }
@@ -104,7 +111,7 @@ export async function proveAndConfirm(
  * Runs proofs sequentially to avoid OOM from concurrent snarkjs workers.
  */
 export async function retryPendingProofs(
-    notes: { leafIndex: number; confirmed?: boolean }[],
+    notes: { leafIndex: number; confirmed?: boolean; asset?: string }[],
 ): Promise<number[]> {
     const unconfirmed = notes.filter(n => n.confirmed !== true);
     if (unconfirmed.length === 0) return [];
@@ -112,8 +119,9 @@ export async function retryPendingProofs(
     const confirmedIndices: number[] = [];
 
     for (const note of unconfirmed) {
+        const pool = poolForAsset(note.asset);
         try {
-            const res = await api.treeRetry(note.leafIndex);
+            const res = await api.treeRetry(note.leafIndex, pool);
             if (res.status === 'confirmed') {
                 confirmedIndices.push(note.leafIndex);
                 continue;
@@ -133,7 +141,7 @@ export async function retryPendingProofs(
                         proof_b: Array.from(bundle.proof.b),
                         proof_c: Array.from(bundle.proof.c),
                         public_signals: bundle.publicSignals.map((s: Uint8Array) => Array.from(s)),
-                    });
+                    }, pool);
                     confirmedIndices.push(note.leafIndex);
                 } catch {
                     // confirm failed — will retry next page load
@@ -159,10 +167,11 @@ export function useInsertProof() {
     const insertProof = async (
         commitment: string,
         setStatus?: (s: string) => void,
+        pool?: string,
     ): Promise<{ index: number }> => {
         // Step 1: assign — fast DB write, returns circuit input
         setStatus?.('Reserving slot in the shielded tree…');
-        const { index, circuitInput } = await api.treeAssign(commitment);
+        const { index, circuitInput } = await api.treeAssign(commitment, pool);
 
         // Step 2: download circuits (cached after first call)
         setStatus?.('Loading ZK circuit…');
@@ -187,7 +196,7 @@ export function useInsertProof() {
                 proof_b: Array.from(bundle.proof.b),
                 proof_c: Array.from(bundle.proof.c),
                 public_signals: bundle.publicSignals.map((s: Uint8Array) => Array.from(s)),
-            });
+            }, pool);
         } catch (confirmErr: any) {
             // Non-fatal: index is reserved; the leaf can be confirmed later.
             console.warn('[useInsertProof] confirm failed (note still saved):', confirmErr?.message);

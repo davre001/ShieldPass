@@ -2,14 +2,18 @@ import { useEffect, useRef } from "react";
 import { rpc, scValToNative } from "@stellar/stellar-sdk";
 import { useSession } from "./session";
 import { api } from "./api";
-import { formatUnits } from "./assets";
+import { formatUnits, SUPPORTED_ASSETS } from "./assets";
 
 const RPC_URL = import.meta.env.VITE_RPC_URL || "https://soroban-testnet.stellar.org";
 const POLL_MS = 20_000;
 const LEDGERS_LOOKBACK = 100; // ~8 min of history on first load
-// The shielded pool. Transfers FROM it (unshields / swap payouts) are already announced
-// by their own flow, so we must not double-notify them as a generic public "Received".
-const POOL_CONTRACT = import.meta.env.VITE_ESCROW_CONTRACT_ID as string | undefined;
+// The shielded pools (one per asset). Transfers FROM any of them (unshields / swap payouts)
+// are already announced by their own flow, so we must not double-notify them as a generic
+// public "Received". Covers every configured pool, not just XLM.
+const POOL_CONTRACTS = new Set(
+  [import.meta.env.VITE_ESCROW_CONTRACT_ID as string | undefined, ...SUPPORTED_ASSETS.map((a) => a.poolContractId)]
+    .filter((id): id is string => !!id),
+);
 
 // Map SAC contract address → { code, decimals }
 function buildSacMeta(): Record<string, { code: string; decimals: number }> {
@@ -78,7 +82,7 @@ export function useIncomingTransactions() {
           if (to !== address) continue; // not for us
           // Pool-originated transfer = an unshield or swap payout, already notified by its
           // own flow. Skip it here so the user doesn't get a duplicate "Received" alert.
-          if (POOL_CONTRACT && from === POOL_CONTRACT) { seen.add(event.id); continue; }
+          if (typeof from === "string" && POOL_CONTRACTS.has(from)) { seen.add(event.id); continue; }
 
           const contractId = typeof event.contractId === "string" ? event.contractId : event.contractId?.toString() ?? "";
           const meta = SAC_META[contractId];

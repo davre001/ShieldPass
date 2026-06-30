@@ -13,6 +13,7 @@ import ShieldedBalance from "../components/ShieldedBalance";
 import ErrorNotice from "../components/ErrorNotice";
 import { SUPPORTED_ASSETS, assetByCode, formatUnits, parseUnits } from "../lib/assets";
 import { useWalletBalance } from "../lib/useWalletBalance";
+import { addressToField } from "@shieldpass/sdk/dist/stellar";
 
 const buf = (u8: Uint8Array): Buffer => Buffer.from(u8);
 
@@ -87,7 +88,8 @@ export default function DepositPage() {
 
     // Deposit confirmed on-chain. Run the merkle_insert proof in the browser:
     // assign index → prove in Web Worker → submit to backend → confirm on-chain.
-    const { index: leafIndex } = await insertProof(commitment.toString(), setStatus);
+    // Pool-scoped so the leaf lands in THIS asset's tree.
+    const { index: leafIndex } = await insertProof(commitment.toString(), setStatus, selectedAsset.poolContractId);
 
     session.set({
       notes: [...session.notes, {
@@ -106,7 +108,9 @@ export default function DepositPage() {
     const note = session.notes.find((n) => n.asset === selectedAsset.code && BigInt(n.amount) >= amt);
     if (!note) throw new Error(`No single shielded ${selectedAsset.code} note covers this amount. Try a smaller amount.`);
 
-    const pr = await swapProof.generate(note, amt, { accountNumber: 0n, salt: BigInt(randomField()) }, false);
+    // Bind the proof to the on-chain recipient (the user's own wallet) so the relayer
+    // cannot redirect the unshielded crypto elsewhere.
+    const pr = await swapProof.generate(note, amt, { accountNumber: 0n, salt: BigInt(randomField()) }, false, addressToField(session.address!));
     if (!pr) throw new Error(swapProof.error || "Proof generation failed.");
 
     setStatus("Approve the unshield on your device…");
@@ -120,7 +124,7 @@ export default function DepositPage() {
 
     setStatus("Updating your balance…");
     const changeCommitment = BigInt("0x" + Buffer.from(pr.publicSignals[1]).toString("hex")).toString();
-    const { index } = await insertProof(changeCommitment, setStatus);
+    const { index } = await insertProof(changeCommitment, setStatus, selectedAsset.poolContractId);
     const changeNotes = BigInt(pr.changeNote.amount) > 0n ? [{
       amount: pr.changeNote.amount, asset: note.asset, randomness: pr.changeNote.randomness,
       leafIndex: index, compliance: note.compliance,

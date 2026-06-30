@@ -4,14 +4,11 @@ import {
 } from '@shieldpass/sdk';
 import { StellarContractClient } from '@shieldpass/sdk/dist/stellar';
 import { prisma } from '../db';
+import { type PoolConfig, getPoolConfig, defaultPoolId, allPoolIds } from './pools';
 
-const CONTRACT_ID = process.env.STELLAR_CONTRACT_ID || '';
 const RELAYER_SECRET = process.env.STELLAR_RELAYER_SECRET || '';
 const RPC_URL = process.env.STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org';
 const NETWORK = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
-// XLM SAC address — needed to fund the pool contract when issuing faucet notes.
-const XLM_SAC_ADDRESS = process.env.XLM_SAC_ADDRESS || '';
-const FAUCET_NOTE_AMOUNT = BigInt(process.env.FAUCET_NOTE_AMOUNT || '5000000000'); // 500 XLM default
 
 const DEPTH = 20;
 
@@ -19,14 +16,15 @@ const DEPTH = 20;
 const PENDING_TTL_MS = 2 * 60 * 1000;
 
 /**
- * Server-side mirror of the on-chain commitment tree. Serves two roles:
+ * Server-side mirror of ONE on-chain commitment tree (one shielded_pool instance).
+ * Each asset has its own pool/tree, so there is one TreeService per pool — see the
+ * `treeServiceFor` registry below. Responsibilities:
  *  1. Source of truth for membership paths (to build spend proofs in the browser).
- *  2. Coordinates the merkle_insert flow: backend assigns an index + circuit
- *     input, browser proves, browser returns the proof, backend submits on-chain.
- *     This keeps the expensive snarkjs prove() off the server.
+ *  2. Coordinates the merkle_insert flow: backend assigns an index + circuit input,
+ *     browser proves, browser returns the proof, backend submits on-chain.
  *
- * The faucet seedNote path is the ONLY place prove() still runs server-side
- * (no browser is involved at signup time and it is a very infrequent operation).
+ * The faucet seedNote path is the ONLY place prove() still runs server-side, and only
+ * for the faucet pool (XLM) at signup.
  */
 class TreeService {
     private tree = new IncrementalMerkleTree(DEPTH);
@@ -35,16 +33,23 @@ class TreeService {
     // shared tree / leaf index (critical on a single Render instance).
     private chain: Promise<unknown> = Promise.resolve();
 
+    constructor(private readonly pool: PoolConfig) {}
+
+    private get poolId(): string { return this.pool.poolId; }
+
     private serialize<T>(fn: () => Promise<T>): Promise<T> {
         const run = this.chain.then(() => fn());
         this.chain = run.then(() => undefined, () => undefined);
         return run;
     }
 
-    /** Rebuild the in-memory tree from persisted leaves (idempotent). */
+    /** Rebuild the in-memory tree from this pool's persisted leaves (idempotent). */
     private async ensureLoaded(): Promise<void> {
         if (this.loaded) return;
-        const leaves = await prisma.treeLeaf.findMany({ orderBy: { index: 'asc' } });
+        const leaves = await prisma.treeLeaf.findMany({
+            where: { poolId: this.poolId },
+            orderBy: { index: 'asc' },
+        });
         for (const l of leaves) this.tree.setLeaf(l.index, BigInt(l.commitment));
         (this.tree as unknown as { count: number }).count = leaves.length;
         this.loaded = true;
@@ -65,9 +70,12 @@ class TreeService {
         return { siblings, indices, root: this.tree.root().toString() };
     }
 
-    /** Look up the index of a known commitment (so the client can fetch its path). */
+    /** Look up the index of a known commitment in this pool (so the client can fetch its path). */
     async indexOf(commitment: string): Promise<number | null> {
-        const row = await prisma.treeLeaf.findFirst({ where: { commitment }, select: { index: true } });
+        const row = await prisma.treeLeaf.findFirst({
+            where: { poolId: this.poolId, commitment },
+            select: { index: true },
+        });
         return row ? row.index : null;
     }
 
@@ -80,19 +88,21 @@ class TreeService {
      * a proof built against the wrong old_root.
      */
     private async assertSyncedWithChain(): Promise<void> {
-        if (!CONTRACT_ID || !RELAYER_SECRET) return;
+        if (!this.poolId || !RELAYER_SECRET) return;
         try {
-            const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
+            const pool = new ShieldedPoolClient(RPC_URL, NETWORK, this.poolId);
             const chainIndex = await pool.nextIndex();
             // Compare CONFIRMED DB leaves only — pending leaves are legitimately
             // ahead of the chain (they are in-flight proofs, not committed yet).
-            const confirmedCount = await prisma.treeLeaf.count({ where: { status: 'confirmed' } });
+            const confirmedCount = await prisma.treeLeaf.count({
+                where: { poolId: this.poolId, status: 'confirmed' },
+            });
             if (chainIndex !== confirmedCount) {
                 throw new Error(
-                    `[tree] DIVERGED: DB has ${confirmedCount} confirmed leaves, chain has ${chainIndex}. ` +
+                    `[tree] DIVERGED (pool ${this.poolId}): DB has ${confirmedCount} confirmed leaves, chain has ${chainIndex}. ` +
                     `A previous insert tx likely failed after the DB was marked confirmed. ` +
                     `To recover without redeploying, run in Neon: ` +
-                    `UPDATE "TreeLeaf" SET status='pending' WHERE status='confirmed' AND index >= ${chainIndex};`
+                    `UPDATE "TreeLeaf" SET status='pending' WHERE "poolId"='${this.poolId}' AND status='confirmed' AND index >= ${chainIndex};`
                 );
             }
         } catch (e: any) {
@@ -106,9 +116,6 @@ class TreeService {
     /**
      * Step 1 of client-side insert: atomically advance the in-memory tree, persist
      * the leaf as "pending", and return the circuit input the browser needs to prove.
-     *
-     * The leaf is marked pending so we know the browser hasn't submitted its proof
-     * yet. A background cleanup job flags leaves stuck in pending > 2 min.
      */
     async assignInsert(commitment: bigint): Promise<{
         index: number;
@@ -120,9 +127,9 @@ class TreeService {
             const index = this.tree.nextIndex;
             const circuitInput = buildInsertInput(this.tree, commitment); // mutates tree
             await prisma.treeLeaf.create({
-                data: { index, commitment: commitment.toString(), status: 'pending', assignedAt: new Date(), circuitInput: circuitInput as any },
+                data: { poolId: this.poolId, index, commitment: commitment.toString(), status: 'pending', assignedAt: new Date(), circuitInput: circuitInput as any },
             });
-            console.log(`[tree/assign] index=${index} commitment=${commitment}`);
+            console.log(`[tree/assign] pool=${this.poolId} index=${index} commitment=${commitment}`);
             return { index, circuitInput };
         });
     }
@@ -138,31 +145,29 @@ class TreeService {
         publicSignals: Uint8Array[],
     ): Promise<{ txHash?: string }> {
         // Validate the leaf exists and is pending
-        const leaf = await prisma.treeLeaf.findUnique({ where: { index } });
-        if (!leaf) throw new Error(`No leaf at index ${index}`);
+        const leaf = await prisma.treeLeaf.findUnique({ where: { poolId_index: { poolId: this.poolId, index } } });
+        if (!leaf) throw new Error(`No leaf at index ${index} in pool ${this.poolId}`);
         if (leaf.status === 'confirmed') {
-            console.warn(`[tree/confirm] index=${index} already confirmed — skipping`);
+            console.warn(`[tree/confirm] pool=${this.poolId} index=${index} already confirmed — skipping`);
             return { txHash: undefined };
         }
 
         // NEVER mark a leaf confirmed without actually landing the insert on-chain.
-        // If the contract/relayer aren't configured (e.g. env vars momentarily unset
-        // mid-deploy), throw so the leaf stays pending — silently confirming here is
-        // what creates a phantom DB leaf that the chain doesn't have, diverging the tree
-        // and making every later spend fail with "unknown merkle root".
-        if (!CONTRACT_ID || !RELAYER_SECRET) {
-            throw new Error('[tree/confirm] CONTRACT_ID/RELAYER_SECRET not configured — refusing to mark leaf confirmed (would diverge the tree).');
+        if (!this.poolId || !RELAYER_SECRET) {
+            throw new Error('[tree/confirm] pool contract id / RELAYER_SECRET not configured — refusing to mark leaf confirmed (would diverge the tree).');
         }
-        const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
+        const pool = new ShieldedPoolClient(RPC_URL, NETWORK, this.poolId);
         const txHash = await pool.insert(proof, publicSignals, Keypair.fromSecret(RELAYER_SECRET));
-        // Wait for the tx to be committed before marking the leaf confirmed.
-        // If the tx fails on-chain the leaf stays pending and the retry mechanism
-        // can re-submit a fresh proof without DB/chain divergence.
         await pool.waitForLanding(txHash);
-        console.log(`[tree/confirm] index=${index} tx=${txHash}`);
+        console.log(`[tree/confirm] pool=${this.poolId} index=${index} tx=${txHash}`);
 
-        await prisma.treeLeaf.update({ where: { index }, data: { status: 'confirmed' } });
+        await prisma.treeLeaf.update({ where: { poolId_index: { poolId: this.poolId, index } }, data: { status: 'confirmed' } });
         return { txHash };
+    }
+
+    /** Fetch a stored pending leaf (for the browser's /tree/retry recovery). */
+    async getLeaf(index: number) {
+        return prisma.treeLeaf.findUnique({ where: { poolId_index: { poolId: this.poolId, index } } });
     }
 
     // ── Faucet assign (client-side proving) ──────────────────────────────────
@@ -170,97 +175,82 @@ class TreeService {
     /**
      * Reserve a tree index for a faucet note and return the circuit input the browser
      * needs to prove. DB/tree only — NO on-chain I/O, so it never blocks sign-in.
-     * prove() never runs server-side — the browser does it via the normal confirm flow.
-     *
-     * The matching on-chain work (faucet_seed + pool funding) is settled separately by
-     * settleFaucetOnChain(), which the caller fires in the background after responding.
      */
     async faucetAssign(commitment: bigint): Promise<{ index: number; circuitInput: Record<string, unknown> }> {
-        // Reserve the tree index + build the browser's circuit input FIRST (DB/tree
-        // only, no on-chain I/O) so sign-in returns in ~1-2s. The relayer's on-chain
-        // work (faucet_seed + pool funding) runs in the background while the browser
-        // generates its merkle_insert proof (~5-15s) — that proving window masks the
-        // testnet landing latency, so the browser's /tree/confirm insert sees the
-        // commitment already Pending by the time it submits.
         return this.assignInsert(commitment);
     }
 
     /**
-     * Background, off the HTTP critical path: settle a faucet note on-chain. The two
-     * relayer transactions are serialized via waitForLanding because they share one
-     * account sequence number — submitting both at once would collide (txBAD_SEQ).
-     *
-     *  1. faucet_seed(commitment) — registers the note commitment as Pending. This is
-     *     CHEAP: it only spends gas (a few stroops in fees), NOT the faucet amount. As
-     *     long as the relayer can pay fees, it lands. The browser's insert depends on
-     *     this, so it runs first.
-     *  2. fundWallet(pool, FAUCET_NOTE_AMOUNT) — backs the note with real XLM so it can
-     *     be unshielded (cashed out) later. This is only needed at cash-out time; it
-     *     never blocks the note's creation or private transfer. If the relayer is short
-     *     on XLM, the note still exists and is transferable — only unshield waits.
-     *
-     * Failure handling: if faucet_seed never lands, the browser's insert simulation
-     * fails, the pending leaf is rolled back by cleanupExpiredPending after 2 min (the
-     * tree stays consistent), and the user simply gets no note — they can re-link/login
-     * to retry. If it lands late, the browser's retryPendingProofs re-submits on reload.
+     * Background, off the HTTP critical path: settle a faucet note on-chain (faucet pool only).
+     *  1. faucet_seed(commitment) — registers the note commitment as Pending (gas only).
+     *  2. fundWallet(pool, faucetAmount) — backs the note with real crypto so it can be unshielded.
      */
     async settleFaucetOnChain(commitment: bigint): Promise<void> {
-        if (!CONTRACT_ID || !RELAYER_SECRET) return;
-        const pool = new ShieldedPoolClient(RPC_URL, NETWORK, CONTRACT_ID);
+        if (!this.poolId || !RELAYER_SECRET) return;
+        if (!this.pool.faucet) {
+            console.warn(`[tree/faucet] pool ${this.poolId} is not a faucet pool — skipping settle`);
+            return;
+        }
+        const pool = new ShieldedPoolClient(RPC_URL, NETWORK, this.poolId);
         const relayer = Keypair.fromSecret(RELAYER_SECRET);
 
-        // 1. Register the commitment (gas only). faucetSeed waits for landing so the
-        //    pool-funding tx below gets a fresh sequence number off the same account.
         await pool.faucetSeed(fieldToBytes32(commitment), relayer);
         console.log(`[tree/faucet] faucet_seed landed for commitment=${commitment}`);
 
-        // 2. Back the note in the pool (only matters at unshield/cash-out time).
-        if (XLM_SAC_ADDRESS) {
-            const stellar = new StellarContractClient(RPC_URL, NETWORK, XLM_SAC_ADDRESS);
-            const fundHash = await stellar.fundWallet(XLM_SAC_ADDRESS, CONTRACT_ID, FAUCET_NOTE_AMOUNT, relayer);
+        if (this.pool.sacAddress) {
+            const stellar = new StellarContractClient(RPC_URL, NETWORK, this.pool.sacAddress);
+            const fundHash = await stellar.fundWallet(this.pool.sacAddress, this.poolId, this.pool.faucetAmount, relayer);
             await pool.waitForLanding(fundHash);
-            console.log(`[tree/faucet] funded pool ${FAUCET_NOTE_AMOUNT} stroops tx=${fundHash}`);
+            console.log(`[tree/faucet] funded pool ${this.pool.faucetAmount} stroops tx=${fundHash}`);
         } else {
-            console.warn('[tree/faucet] XLM_SAC_ADDRESS not set — pool not funded, unshield will fail');
+            console.warn('[tree/faucet] pool SAC not set — pool not funded, unshield will fail');
         }
     }
 
     // ── Background cleanup ────────────────────────────────────────────────────
 
-    /**
-     * Roll back any pending leaves that have been stuck past PENDING_TTL_MS.
-     *
-     * When a browser closes mid-proof the DB has a pending leaf but the chain does
-     * not. That means DB.nextIndex > chain.nextIndex, which blocks ALL subsequent
-     * inserts (assertSyncedWithChain throws). Without a rollback the tree is frozen
-     * until the original browser comes back and retries.
-     *
-     * Fix: delete the expired pending rows from the DB and force a tree rebuild.
-     * After the rebuild nextIndex matches the chain again and new inserts work.
-     * The original user will get a 404 on /tree/retry and their note is quietly
-     * re-issued on their next onboarding/login attempt.
-     */
+    /** Roll back this pool's pending leaves stuck past PENDING_TTL_MS. */
     async cleanupExpiredPending(): Promise<void> {
         const cutoff = new Date(Date.now() - PENDING_TTL_MS);
         const stale = await prisma.treeLeaf.findMany({
-            where: { status: 'pending', assignedAt: { lt: cutoff } },
+            where: { poolId: this.poolId, status: 'pending', assignedAt: { lt: cutoff } },
         });
         if (stale.length === 0) return;
 
         const indices = stale.map((l) => l.index);
-        console.warn(`[tree/cleanup] rolling back ${stale.length} expired pending leaf(ves):`,
+        console.warn(`[tree/cleanup] pool=${this.poolId} rolling back ${stale.length} expired pending leaf(ves):`,
             indices.map((i) => `index=${i}`).join(', '));
 
-        await prisma.treeLeaf.deleteMany({ where: { index: { in: indices } } });
+        await prisma.treeLeaf.deleteMany({ where: { poolId: this.poolId, index: { in: indices } } });
 
-        // Force a full rebuild on the next operation so the in-memory tree drops
-        // these leaves and nextIndex falls back in line with the chain.
+        // Force a full rebuild on the next operation so the in-memory tree drops these.
         this.loaded = false;
         console.log('[tree/cleanup] in-memory tree invalidated — will rebuild on next request');
     }
 }
 
-export const treeService = new TreeService();
+// ── Per-pool registry ─────────────────────────────────────────────────────────
 
-// Run the cleanup check every 60 seconds.
-setInterval(() => treeService.cleanupExpiredPending().catch(() => {}), 60_000);
+const registry = new Map<string, TreeService>();
+
+/**
+ * Get the TreeService for a pool. `poolId` is the on-chain shielded_pool contract id
+ * the frontend used for its deposit/unshield/swap invoke; omit it to use the default
+ * (XLM) pool. Throws on an unknown, non-empty pool id so a bad request can't write into
+ * the wrong tree.
+ */
+export function treeServiceFor(poolId?: string): TreeService {
+    const cfg = getPoolConfig(poolId);
+    if (!cfg) throw new Error(`unknown shielded pool: ${poolId}`);
+    let svc = registry.get(cfg.poolId);
+    if (!svc) { svc = new TreeService(cfg); registry.set(cfg.poolId, svc); }
+    return svc;
+}
+
+/** The default-pool (XLM) service. Kept for the faucet path and back-compat callers. */
+export const treeService = treeServiceFor(defaultPoolId());
+
+// Run the cleanup check every 60 seconds across ALL configured pools.
+setInterval(() => {
+    for (const id of allPoolIds()) treeServiceFor(id).cleanupExpiredPending().catch(() => {});
+}, 60_000);

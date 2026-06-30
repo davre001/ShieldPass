@@ -69,7 +69,12 @@ async function main() {
   console.log("proving merkle_insert (note @0)...");
   const insNote = await prove({ old_root: toStr(noteOldRoot), new_root: toStr(merkle_root), leaf: toStr(leaf), index: "0", siblings: noteSiblings.map(toStr) }, "merkle_insert");
 
-  // (1) confidential_swap: spend note, swap 250, change 750
+  // (1) confidential_swap: spend note, swap 250, change 750.
+  // `recipient` binds the unshield destination into the proof: it is
+  //   int_be(sha256(xdr(address))) mod r
+  // for the contract address CABITVLRUBEUPLACCPI7VFZVUBCNDFJRRUWBWTIJXZ5D2NHVB3LMVM6K.
+  // The unshield contract test MUST pass that same address (the off-ramp swap ignores it).
+  const RECIPIENT_FIELD = "11239796314445253800532920576593019933732159008483329631653343833670468030781";
   console.log("proving confidential_swap...");
   const swap = await prove({
     sk: toStr(sk), in_amount: toStr(in_amount), in_randomness: toStr(in_randomness),
@@ -77,6 +82,7 @@ async function main() {
     change_randomness: "222222", bank_account_number: "1234567890", secret_salt: "999999",
     hardware_attested: "1", bvn_verified: "1", good_standing: "1",
     merkle_root: toStr(merkle_root), require_bvn: "0", swap_amount: "250",
+    recipient: RECIPIENT_FIELD,
   }, "confidential_swap");
   console.log("  swap publicSignals:", swap.publicSignals);
 

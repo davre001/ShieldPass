@@ -1,23 +1,29 @@
 import { Router } from 'express';
-import { treeService } from '../services/tree';
+import { treeServiceFor } from '../services/tree';
 
 const router = Router();
 
-// GET /tree/state — current root + next free index.
-router.get('/state', async (_req, res) => {
+// Resolve the target pool's tree service from a `pool` query/body field (the on-chain
+// shielded_pool contract id). Omitted → default (XLM) pool. Unknown id → 400.
+function svcFrom(poolId: unknown) {
+    return treeServiceFor(typeof poolId === 'string' && poolId ? poolId : undefined);
+}
+
+// GET /tree/state?pool=<contractId> — current root + next free index for a pool.
+router.get('/state', async (req, res) => {
     try {
-        res.json(await treeService.state());
+        res.json(await svcFrom(req.query.pool).state());
     } catch (e: any) {
         res.status(500).json({ error: e?.message || 'tree state failed' });
     }
 });
 
-// GET /tree/path/:index — sibling path + index bits for a leaf (membership proof input).
+// GET /tree/path/:index?pool=<contractId> — sibling path + index bits (membership proof input).
 router.get('/path/:index', async (req, res) => {
     const index = Number(req.params.index);
     if (!Number.isInteger(index) || index < 0) return res.status(400).json({ error: 'invalid index' });
     try {
-        res.json(await treeService.pathFor(index));
+        res.json(await svcFrom(req.query.pool).pathFor(index));
     } catch (e: any) {
         res.status(500).json({ error: e?.message || 'tree path failed' });
     }
@@ -27,43 +33,30 @@ router.get('/path/:index', async (req, res) => {
 
 /**
  * POST /tree/assign
- * Step 1: register a commitment and return the circuit input the browser needs to
- * generate the merkle_insert proof. The leaf is written as "pending" immediately
- * so the index is reserved, even though the proof hasn't been submitted yet.
- *
- * Body: { commitment: string }   (decimal field element)
- * Returns: { index: number, circuitInput: { old_root, new_root, leaf, index, siblings } }
+ * Body: { commitment: string, pool?: string }   (pool = shielded_pool contract id)
+ * Returns: { index, circuitInput }
  */
 router.post('/assign', async (req, res) => {
-    const { commitment } = req.body || {};
+    const { commitment, pool } = req.body || {};
     if (!commitment || !/^\d+$/.test(String(commitment))) {
         return res.status(400).json({ error: 'commitment (decimal field element) is required' });
     }
     try {
-        const result = await treeService.assignInsert(BigInt(commitment));
+        const result = await svcFrom(pool).assignInsert(BigInt(commitment));
         res.json(result);
     } catch (e: any) {
-        console.error('[tree/assign] FAILED commitment=%s error=%s', commitment, e?.message);
+        console.error('[tree/assign] FAILED commitment=%s pool=%s error=%s', commitment, pool, e?.message);
         res.status(500).json({ error: e?.message || 'assign failed' });
     }
 });
 
 /**
  * POST /tree/confirm
- * Step 2: receive the browser-generated proof and submit it on-chain. Marks the
- * leaf as "confirmed" once the transaction is accepted.
- *
- * Body: {
- *   index: number,
- *   proof_a: number[],   (Uint8Array serialised as a plain number array by JSON)
- *   proof_b: number[],
- *   proof_c: number[],
- *   public_signals: number[][]
- * }
- * Returns: { txHash?: string }
+ * Body: { index, proof_a[], proof_b[], proof_c[], public_signals[][], pool? }
+ * Returns: { txHash? }
  */
 router.post('/confirm', async (req, res) => {
-    const { index, proof_a, proof_b, proof_c, public_signals } = req.body || {};
+    const { index, proof_a, proof_b, proof_c, public_signals, pool } = req.body || {};
     if (typeof index !== 'number' || !proof_a || !proof_b || !proof_c || !public_signals) {
         return res.status(400).json({ error: 'index, proof_a, proof_b, proof_c and public_signals are required' });
     }
@@ -74,18 +67,18 @@ router.post('/confirm', async (req, res) => {
             c: Uint8Array.from(proof_c),
         };
         const signals: Uint8Array[] = (public_signals as number[][]).map((s) => Uint8Array.from(s));
-        const result = await treeService.confirmInsert(index, proof, signals);
+        const result = await svcFrom(pool).confirmInsert(index, proof, signals);
         res.json(result);
     } catch (e: any) {
-        console.error('[tree/confirm] FAILED index=%s error=%s', index, e?.message);
+        console.error('[tree/confirm] FAILED index=%s pool=%s error=%s', index, pool, e?.message);
         res.status(500).json({ error: e?.message || 'confirm failed' });
     }
 });
 
-// GET /tree/index/:commitment — resolve a commitment to its leaf index.
+// GET /tree/index/:commitment?pool=<contractId> — resolve a commitment to its leaf index.
 router.get('/index/:commitment', async (req, res) => {
     try {
-        const index = await treeService.indexOf(String(req.params.commitment));
+        const index = await svcFrom(req.query.pool).indexOf(String(req.params.commitment));
         if (index === null) return res.status(404).json({ error: 'commitment not in tree' });
         res.json({ index });
     } catch (e: any) {
@@ -94,18 +87,14 @@ router.get('/index/:commitment', async (req, res) => {
 });
 
 /**
- * GET /tree/retry/:index
- * Lets the browser recover a stuck pending proof without re-calling /tree/assign.
- * Returns the stored circuitInput if the leaf is still pending.
- * Returns { status: 'confirmed' } if it already landed on-chain.
- * Returns 404 if the index was rolled back by the cleanup job (treat as "re-issue needed").
+ * GET /tree/retry/:index?pool=<contractId>
+ * Recover a stuck pending proof without re-calling /tree/assign.
  */
 router.get('/retry/:index', async (req, res) => {
     const index = Number(req.params.index);
     if (!Number.isInteger(index) || index < 0) return res.status(400).json({ error: 'invalid index' });
     try {
-        const { prisma } = await import('../db');
-        const leaf = await prisma.treeLeaf.findUnique({ where: { index } });
+        const leaf = await svcFrom(req.query.pool).getLeaf(index);
         if (!leaf) return res.status(404).json({ error: 'leaf not found (may have been rolled back)' });
         if (leaf.status === 'confirmed') return res.json({ status: 'confirmed' });
         if (!leaf.circuitInput) return res.status(409).json({ error: 'no circuitInput stored for this leaf' });

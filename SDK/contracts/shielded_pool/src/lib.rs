@@ -3,6 +3,7 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, token, Address, Bytes, BytesN, Env, U256, Vec,
 };
 use soroban_sdk::crypto::bn254::Fr;
+use soroban_sdk::xdr::ToXdr;
 
 pub mod groth16;
 pub mod vk;
@@ -150,7 +151,9 @@ impl ShieldedPool {
         public_signals: Vec<BytesN<32>>,
         refund_commitment: BytesN<32>,
     ) -> u64 {
-        assert!(public_signals.len() == 6, "swap: bad public signals");
+        // 7 signals: [..., swap_amount, recipient]. The off-ramp ignores `recipient`
+        // (signal [6]) — it is bound by the blinded bank hash, not an on-chain address.
+        assert!(public_signals.len() == 7, "swap: bad public signals");
         Self::require_canonical(&env, &public_signals);
         assert!(
             groth16::verify(&env, &vk::confidential_swap_vk(&env), &Self::g1(&env, &proof_a),
@@ -212,7 +215,7 @@ impl ShieldedPool {
         public_signals: Vec<BytesN<32>>,
         recipient: Address,
     ) {
-        assert!(public_signals.len() == 6, "unshield: bad public signals");
+        assert!(public_signals.len() == 7, "unshield: bad public signals");
         Self::require_canonical(&env, &public_signals);
         assert!(
             groth16::verify(&env, &vk::confidential_swap_vk(&env), &Self::g1(&env, &proof_a),
@@ -220,6 +223,14 @@ impl ShieldedPool {
                 &Self::to_fr_vec(&env, &public_signals)),
             "unshield: invalid proof"
         );
+
+        // Destination binding (anti front-running): the proof commits to a recipient via
+        // public_signals[6] = int_be(sha256(xdr(recipient))) mod r. Recompute it from the
+        // passed Address and reject any mismatch, so a malicious/compromised relayer cannot
+        // redirect the unshielded crypto to an address the prover never authorized.
+        let bound = Self::recipient_field(&env, &recipient);
+        let claimed = U256::from_be_bytes(&env, &Bytes::from_array(&env, &public_signals.get(6).unwrap().to_array()));
+        assert!(bound == claimed, "unshield: recipient not bound to proof");
 
         let nullifier = public_signals.get(0).unwrap();
         let change_commitment = public_signals.get(1).unwrap();
@@ -354,6 +365,17 @@ impl ShieldedPool {
             out.push_back(fr_from(env, &s.to_array()));
         }
         out
+    }
+
+    /// Field encoding of a recipient Address, matched bit-for-bit by the browser prover:
+    ///   int_be(sha256(xdr(address))) mod r
+    /// Used to bind an unshield's on-chain destination into the zero-knowledge proof.
+    fn recipient_field(env: &Env, addr: &Address) -> U256 {
+        let xdr = addr.clone().to_xdr(env);
+        let h: BytesN<32> = env.crypto().sha256(&xdr).into();
+        let hv = U256::from_be_bytes(env, &Bytes::from_array(env, &h.to_array()));
+        let r = U256::from_be_bytes(env, &Bytes::from_array(env, &R_BE));
+        hv.rem_euclid(&r)
     }
 
     /// Reject non-canonical (>= r) public signals to prevent aliasing attacks.

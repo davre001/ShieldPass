@@ -144,10 +144,13 @@ model NoteBlob {
 // status: "pending" = browser has been given the circuit input and is proving
 //         "confirmed" = browser submitted the proof and it was accepted on-chain
 model TreeLeaf {
-  index        Int      @id           // append-only position in the depth-20 tree
+  poolId       String                 // shielded_pool contract id this leaf belongs to (one tree per asset)
+  index        Int                    // append-only position in the depth-20 tree (per pool)
   commitment   String                 // BN254 field element (decimal string)
   status       String   @default("confirmed") // "pending" | "confirmed"
   assignedAt   DateTime?              // set when status flips to pending
   circuitInput Json?                  // stored at assign-time so a stuck proof can be retried
   createdAt    DateTime @default(now())
+
+  @@id([poolId, index])
 }

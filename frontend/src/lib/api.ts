@@ -58,18 +58,20 @@ export const api = {
     request<SwapRecord[]>(`/swap/history?email=${encodeURIComponent(email)}`),
 
   // ── Shielded tree: two-step client-side insert ──
+  // `pool` is the shielded_pool contract id whose tree this leaf belongs to (one tree per
+  // asset). Omitted → backend uses the default (XLM) pool, so faucet/legacy calls still work.
   // Step 1: reserve index + get circuit input
-  treeAssign: (commitment: string) =>
-    request<{ index: number; circuitInput: Record<string, unknown> }>("/tree/assign", { method: "POST", body: JSON.stringify({ commitment }) }),
+  treeAssign: (commitment: string, pool?: string) =>
+    request<{ index: number; circuitInput: Record<string, unknown> }>("/tree/assign", { method: "POST", body: JSON.stringify({ commitment, pool }) }),
   // Step 2: send browser-generated proof, backend submits on-chain
   treeConfirm: (index: number, proof: {
     proof_a: number[]; proof_b: number[]; proof_c: number[]; public_signals: number[][];
-  }) =>
-    request<{ txHash?: string }>("/tree/confirm", { method: "POST", body: JSON.stringify({ index, ...proof }) }),
+  }, pool?: string) =>
+    request<{ txHash?: string }>("/tree/confirm", { method: "POST", body: JSON.stringify({ index, ...proof, pool }) }),
   // Retry a stuck pending proof: returns circuitInput if still pending, or { status: 'confirmed' }
-  treeRetry: (index: number) =>
+  treeRetry: (index: number, pool?: string) =>
     request<{ status: 'confirmed' } | { status: 'pending'; index: number; circuitInput: Record<string, unknown> }>(
-      `/tree/retry/${index}`),
+      `/tree/retry/${index}${pool ? `?pool=${encodeURIComponent(pool)}` : ''}`),
 
   lookupShielded: (email: string) =>
     request<{ owner: string; encPub: string; address: string | null }>(`/notes/identity/${encodeURIComponent(email)}`),
@@ -78,8 +80,8 @@ export const api = {
   scanNotes: (cursor: number) =>
     request<{ blobs: { id: number; commitment: string; ephemeralPub: string; ciphertext: string }[]; nextCursor: number }>(
       `/notes/since/${cursor}`),
-  treeIndexOf: (commitment: string) =>
-    request<{ index: number }>(`/tree/index/${commitment}`),
+  treeIndexOf: (commitment: string, pool?: string) =>
+    request<{ index: number }>(`/tree/index/${commitment}${pool ? `?pool=${encodeURIComponent(pool)}` : ''}`),
 
   notify: (input: { email: string; type: string; title: string; amount?: string; asset?: string; body?: string; txHash?: string }) =>
     request<{ ok: boolean }>("/notifications", { method: "POST", body: JSON.stringify(input) }),

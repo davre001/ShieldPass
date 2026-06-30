@@ -12,6 +12,9 @@ import ErrorNotice from "../components/ErrorNotice";
 import { PUBLIC_ASSETS, assetByCode, formatUnits, parseUnits } from "../lib/assets";
 import { useWalletBalance } from "../lib/useWalletBalance";
 import { useInsertProof } from "../lib/useInsertProof";
+import { StellarContractClient, addressToField } from "@shieldpass/sdk/dist/stellar";
+
+const RPC_URL = import.meta.env.VITE_RPC_URL || "https://soroban-testnet.stellar.org";
 
 const isAddr = (value: string) => /^[GC][A-Z2-7]{55}$/.test(value);
 const isEmail = (value: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
@@ -104,6 +107,19 @@ export default function SendPage() {
     if (!asset) throw new Error("Asset not configured.");
     const units = parseUnits(amount, asset.decimals);
     if (units <= 0n) throw new Error("Amount must be greater than zero.");
+    // Balance guard: the SAC transfer would otherwise fail silently on-chain (e.g. sending
+    // USDC the wallet doesn't hold), and we'd wrongly show "Sent". Check first.
+    const net = (import.meta.env.VITE_NETWORK_PASSPHRASE as string) || "Test SDF Network ; September 2015";
+    const balanceClient = new StellarContractClient(RPC_URL, net, asset.sac);
+    let available: bigint;
+    try {
+      available = await balanceClient.getTokenBalance(asset.sac, session.address!);
+    } catch {
+      available = -1n; // balance check unavailable — don't block the send on a read failure
+    }
+    if (available >= 0n && units > available) {
+      throw new Error(`Insufficient ${asset.code}: you have ${formatUnits(available, asset.decimals, 4)} but tried to send ${formatUnits(units, asset.decimals, 4)}.`);
+    }
     // Use transferToken instead of invoke — native SACs (XLM etc.) have no uploadable
     // Wasm, so contract.Client.from() crashes. transferToken builds XDR directly.
     const sendRes = await session.wallet!.transferToken(asset.sac, to, units);
@@ -136,7 +152,8 @@ export default function SendPage() {
     const note = session.notes.find((n) => n.asset === selectedAsset.code && BigInt(n.amount) >= amt);
     if (!note) throw new Error(`No single shielded ${selectedAsset.code} note covers this amount.`);
 
-    const pr = await swapProof.generate(note, amt, { accountNumber: 0n, salt: BigInt(randomField()) }, false);
+    // Bind the proof to the on-chain destination `to` so the relayer cannot redirect funds.
+    const pr = await swapProof.generate(note, amt, { accountNumber: 0n, salt: BigInt(randomField()) }, false, addressToField(to));
     if (!pr) throw new Error(swapProof.error || "Proof generation failed.");
 
     setStatus("Approve the send on your device...");
@@ -150,7 +167,7 @@ export default function SendPage() {
 
     setStatus("Updating your balance...");
     const changeCommitment = BigInt("0x" + Buffer.from(pr.publicSignals[1]).toString("hex")).toString();
-    const { index } = await insertProof(changeCommitment, setStatus);
+    const { index } = await insertProof(changeCommitment, setStatus, selectedAsset.poolContractId);
     const changeNotes = BigInt(pr.changeNote.amount) > 0n ? [{
       amount: pr.changeNote.amount,
       asset: note.asset,

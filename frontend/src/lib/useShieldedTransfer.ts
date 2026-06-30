@@ -66,7 +66,8 @@ export function useShieldedTransfer(apiBaseUrl: string) {
             const { owner: recipient_owner, encPub } = await resolveRecipient(recipient);
 
             setStatus("fetching-path");
-            const res = await fetch(`${apiBaseUrl}/tree/path/${note.leafIndex}`);
+            // Pool-scoped: the membership path must come from THIS asset's tree.
+            const res = await fetch(`${apiBaseUrl}/tree/path/${note.leafIndex}?pool=${encodeURIComponent(asset.poolContractId)}`);
             if (!res.ok) throw new Error("Could not fetch membership path.");
             const { siblings, indices, root } = await res.json();
 
@@ -99,8 +100,8 @@ export function useShieldedTransfer(apiBaseUrl: string) {
             // Insert both output notes into the tree using client-side proving
             // (sequential to avoid racing the index counter).
             setStatus("submitting");
-            const { index: recipientIndex } = await insertProof(outRecipient, (s) => setStatus(s as TransferStatus));
-            const { index: changeIndex } = await insertProof(outChange, (s) => setStatus(s as TransferStatus));
+            const { index: recipientIndex } = await insertProof(outRecipient, (s) => setStatus(s as TransferStatus), asset.poolContractId);
+            const { index: changeIndex } = await insertProof(outChange, (s) => setStatus(s as TransferStatus), asset.poolContractId);
             void recipientIndex;
 
             // deliver the encrypted note blob to the recipient

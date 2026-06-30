@@ -25,6 +25,10 @@ export interface SwapWitnessFromPath {
     bank_account_number: bigint;
     secret_salt: bigint;
     require_bvn: bigint;
+    // Destination binding. For unshield, pass addressToField(recipientAddress) so the
+    // contract can verify the on-chain recipient matches the proof. For withdraw-to-fiat
+    // leave 0 (that flow is bound by the blinded bank hash instead).
+    recipient?: bigint;
 }
 
 export function buildSwapInputFromPath(w: SwapWitnessFromPath): Record<string, unknown> {
@@ -43,6 +47,7 @@ export function buildSwapInputFromPath(w: SwapWitnessFromPath): Record<string, u
         merkle_root: w.merkle_root.toString(),
         require_bvn: w.require_bvn.toString(),
         swap_amount: w.swap_amount.toString(),
+        recipient: (w.recipient ?? 0n).toString(),
     };
 }
 

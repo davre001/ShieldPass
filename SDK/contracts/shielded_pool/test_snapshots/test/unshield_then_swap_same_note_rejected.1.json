@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 5,
+    "address": 4,
     "nonce": 0,
     "mux_id": 0
   },
@@ -431,7 +431,7 @@
                     "symbol": "Balance"
                   },
                   {
-                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                    "address": "CABITVLRUBEUPLACCPI7VFZVUBCNDFJRRUWBWTIJXZ5D2NHVB3LMVM6K"
                   }
                 ]
               },

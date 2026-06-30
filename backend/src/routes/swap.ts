@@ -3,7 +3,8 @@ import { Networks, Keypair } from '@stellar/stellar-sdk';
 import { ShieldedPoolClient } from '@shieldpass/sdk';
 import { prisma } from '../db';
 import { burnNullifier } from '../services/compliance';
-import { treeService } from '../services/tree';
+import { treeServiceFor } from '../services/tree';
+import { poolIdForAsset, defaultPoolId } from '../services/pools';
 import { notify } from './notifications';
 import { getQuote, TIER2_THRESHOLD_NAIRA, type Quote } from '../services/quote';
 import { initiateTransfer as initiateLencoTransfer, type LencoTransferResult } from '../services/lenco';
@@ -166,11 +167,14 @@ router.post('/execute', async (req, res) => {
 
   let txHash: string | null = null;
   const cfg = chainConfig();
-  if (cfg.contractId && cfg.relayerSecret) {
+  // Claim must hit the SAME pool the user swapped from — resolve it by asset
+  // (each asset has its own shielded_pool); default to the XLM pool.
+  const poolId = poolIdForAsset(String(assetCode)) || cfg.contractId;
+  if (poolId && cfg.relayerSecret) {
     try {
       // Admin sweeps the pending payout to the treasury. Only a successful claim
       // marks the swap completed; otherwise it remains claim-pending for retry.
-      const pool = new ShieldedPoolClient(cfg.rpcUrl, cfg.network, cfg.contractId);
+      const pool = new ShieldedPoolClient(cfg.rpcUrl, cfg.network, poolId);
       txHash = await pool.claimSwap(BigInt(onChainSwapId), Keypair.fromSecret(cfg.relayerSecret));
     } catch (err) {
       console.error('[swap/execute] claim_swap failed (fiat already paid):', err);
@@ -193,7 +197,7 @@ router.post('/execute', async (req, res) => {
   let changeLeafIndex: number | null = null;
   if (changeCommitment) {
     try {
-      const { index } = await treeService.assignInsert(BigInt(changeCommitment));
+      const { index } = await treeServiceFor(poolId || defaultPoolId()).assignInsert(BigInt(changeCommitment));
       changeLeafIndex = index;
     } catch (e) {
       console.error('[swap/execute] change-note assign failed:', e);

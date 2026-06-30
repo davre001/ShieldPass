@@ -33,6 +33,11 @@ template ConfidentialSwap(DEPTH) {
     signal input merkle_root;
     signal input require_bvn;
     signal input swap_amount;
+    // Destination binding (anti front-running): for unshield this is the field encoding
+    // of the on-chain recipient (int_be(sha256(xdr(address))) mod r); the contract
+    // recomputes it and rejects any tx whose recipient doesn't match. For withdraw-to-fiat
+    // it is unused (pass 0) — that flow is bound by the blinded bank hash instead.
+    signal input recipient;
 
     // ---- public outputs ----
     signal output nullifier;
@@ -102,6 +107,12 @@ template ConfidentialSwap(DEPTH) {
     bk.inputs[1] <== bank_account_number;
     bk.inputs[2] <== secret_salt;
     user_blinded_commitment <== bk.out;
+
+    // Bind `recipient` into the constraint system so the compiler can't optimize the
+    // public signal away. Its value is otherwise unconstrained (the *contract* checks it),
+    // which is exactly Tornado's pattern for committing a destination to the proof.
+    signal recipient_sq;
+    recipient_sq <== recipient * recipient;
 }
 
-component main { public [merkle_root, require_bvn, swap_amount] } = ConfidentialSwap(20);
+component main { public [merkle_root, require_bvn, swap_amount, recipient] } = ConfidentialSwap(20);

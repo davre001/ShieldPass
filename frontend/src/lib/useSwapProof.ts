@@ -15,6 +15,7 @@ import {
 } from '@shieldpass/sdk/dist/notes';
 import { randomField } from '@shieldpass/sdk/dist/identity';
 import { useSession, type ShieldedNote } from './session';
+import { assetByCode } from './assets';
 
 export type SwapProofStatus = 'idle' | 'fetching-path' | 'loading-circuit' | 'generating' | 'done' | 'error';
 
@@ -43,6 +44,10 @@ export function useSwapProof(apiBaseUrl: string) {
         swapAmount: bigint,
         bank: { accountNumber: bigint; salt: bigint },
         requireBvn: boolean,
+        // Destination binding. For unshield, pass addressToField(recipientAddress) so the
+        // proof commits to the on-chain recipient and a relayer can't redirect it. For
+        // withdraw-to-fiat leave 0 (bound by the bank hash instead).
+        recipientField: bigint = 0n,
     ): Promise<SwapProofResult | null> => {
         setError(null);
         try {
@@ -54,9 +59,11 @@ export function useSwapProof(apiBaseUrl: string) {
                 good_standing: BigInt(note.compliance.good_standing),
             };
 
-            // 1. membership path from the indexer
+            // 1. membership path from the indexer — scoped to THIS asset's pool/tree.
             setStatus('fetching-path');
-            const res = await fetch(`${apiBaseUrl}/tree/path/${note.leafIndex}`);
+            const pool = assetByCode(note.asset)?.poolContractId;
+            const pathUrl = `${apiBaseUrl}/tree/path/${note.leafIndex}${pool ? `?pool=${encodeURIComponent(pool)}` : ''}`;
+            const res = await fetch(pathUrl);
             if (!res.ok) throw new Error('Could not fetch membership path from the tree indexer.');
             const { siblings, indices, root } = await res.json();
 
@@ -75,6 +82,7 @@ export function useSwapProof(apiBaseUrl: string) {
                 bank_account_number: bank.accountNumber,
                 secret_salt: bank.salt,
                 require_bvn: requireBvn ? 1n : 0n,
+                recipient: recipientField,
             });
 
             // 3. fetch circuit artifacts + prove

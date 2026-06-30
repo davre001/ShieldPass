@@ -8,6 +8,15 @@ use soroban_sdk::testutils::{Address as _, Ledger};
 use soroban_sdk::token::{StellarAssetClient, TokenClient};
 use soroban_sdk::{Address, BytesN, Env, Vec};
 
+/// The recipient address the swap fixture's proof is bound to (public signal [6] =
+/// recipient_field of this address). unshield tests must pass exactly this address.
+fn bound_recipient(env: &Env) -> Address {
+    Address::from_string(&soroban_sdk::String::from_str(
+        env,
+        "CABITVLRUBEUPLACCPI7VFZVUBCNDFJRRUWBWTIJXZ5D2NHVB3LMVM6K",
+    ))
+}
+
 fn b64(env: &Env, a: &[u8; 64]) -> BytesN<64> { BytesN::from_array(env, a) }
 fn b128(env: &Env, a: &[u8; 128]) -> BytesN<128> { BytesN::from_array(env, a) }
 fn b32(env: &Env, a: &[u8; 32]) -> BytesN<32> { BytesN::from_array(env, a) }
@@ -152,7 +161,7 @@ fn unshield_pays_recipient_and_nullifies() {
     env.cost_estimate().budget().reset_unlimited();
     let c = setup(&env);
     let swap = fx::swap_fixture(); // proves a note worth >= 250, amount = 250
-    let recipient = Address::generate(&env);
+    let recipient = bound_recipient(&env);
 
     c.pool.unshield(&b64(&env, &swap.a), &b128(&env, &swap.b), &b64(&env, &swap.c),
         &sigs(&env, swap.public_signals), &recipient);
@@ -192,10 +201,59 @@ fn unshield_then_swap_same_note_rejected() {
     env.cost_estimate().budget().reset_unlimited();
     let c = setup(&env);
     let swap = fx::swap_fixture();
-    let recipient = Address::generate(&env);
+    let recipient = bound_recipient(&env);
     c.pool.unshield(&b64(&env, &swap.a), &b128(&env, &swap.b), &b64(&env, &swap.c),
         &sigs(&env, swap.public_signals), &recipient);
     // reusing the same note (nullifier) for a swap must fail
     c.pool.confidential_swap(&b64(&env, &swap.a), &b128(&env, &swap.b), &b64(&env, &swap.c),
         &sigs(&env, swap.public_signals), &b32(&env, &[9u8; 32]));
+}
+
+// ── Recipient-binding cross-validation ───────────────────────────────────────
+// The browser prover computes recipient = int_be(sha256(xdr(address))) mod r and
+// feeds it as public signal [6]; the contract recomputes it from the passed Address.
+// These MUST match bit-for-bit. The expected values below were produced by the JS
+// path (@stellar/stellar-base Address.toScVal().toXDR() → sha256 → mod r) so this
+// test fails loudly if the two encodings ever diverge.
+#[test]
+fn recipient_field_matches_js() {
+    use soroban_sdk::{String as SorString};
+    let env = Env::default();
+    let addr = Address::from_string(&SorString::from_str(
+        &env,
+        "CABITVLRUBEUPLACCPI7VFZVUBCNDFJRRUWBWTIJXZ5D2NHVB3LMVM6K",
+    ));
+
+    // 1. XDR of the address ScVal must match the JS Address.toScVal().toXDR().
+    let expected_xdr: [u8; 40] = [
+        0x00, 0x00, 0x00, 0x12, 0x00, 0x00, 0x00, 0x01, 0x02, 0x89, 0xd5, 0x71, 0xa0, 0x49, 0x47, 0xac,
+        0x02, 0x13, 0xd1, 0xfa, 0x97, 0x35, 0xa0, 0x44, 0xd1, 0x95, 0x31, 0x8d, 0x2c, 0x1b, 0x4d, 0x09,
+        0xbe, 0x7a, 0x3d, 0x34, 0xf5, 0x0e, 0xd6, 0xca,
+    ];
+    let xdr = addr.clone().to_xdr(&env);
+    assert_eq!(xdr, Bytes::from_array(&env, &expected_xdr), "to_xdr mismatch vs JS");
+
+    // 2. Full field encoding (sha256 → mod r) must match the JS field element.
+    let expected_field: [u8; 32] = [
+        0x18, 0xd9, 0x7f, 0xd0, 0x38, 0x5b, 0x30, 0xc1, 0xb7, 0x4c, 0x65, 0xe1, 0xb4, 0x69, 0xee, 0x23,
+        0xe4, 0x98, 0x30, 0xaa, 0x69, 0x11, 0x22, 0xa3, 0x8b, 0xe8, 0xce, 0xf6, 0x25, 0x84, 0xd1, 0x3d,
+    ];
+    let got = ShieldedPool::recipient_field(&env, &addr);
+    let want = U256::from_be_bytes(&env, &Bytes::from_array(&env, &expected_field));
+    assert_eq!(got, want, "recipient_field mismatch vs JS");
+}
+
+#[test]
+#[should_panic(expected = "recipient not bound to proof")]
+fn unshield_to_wrong_recipient_rejected() {
+    // The proof is bound to `bound_recipient`; submitting it with any other recipient
+    // (e.g. a relayer redirecting funds to itself) must be rejected even though the
+    // Groth16 proof itself is valid. This is the anti-front-running guarantee.
+    let env = Env::default();
+    env.cost_estimate().budget().reset_unlimited();
+    let c = setup(&env);
+    let swap = fx::swap_fixture();
+    let attacker = Address::generate(&env);
+    c.pool.unshield(&b64(&env, &swap.a), &b128(&env, &swap.b), &b64(&env, &swap.c),
+        &sigs(&env, swap.public_signals), &attacker);
 }

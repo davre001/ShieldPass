@@ -1,6 +1,24 @@
-import { rpc, Contract, Keypair, Networks, TransactionBuilder, Account, BASE_FEE, nativeToScVal, scValToNative, xdr } from '@stellar/stellar-sdk';
+import { rpc, Contract, Keypair, Networks, TransactionBuilder, Account, BASE_FEE, nativeToScVal, scValToNative, xdr, Address, hash } from '@stellar/stellar-sdk';
 import { LockSwapParams, Signer } from './types';
 import { isValidSorobanAddress } from './utils';
+
+// BN254 scalar field order r — recipient field elements must be canonical (< r).
+const BN254_R = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+
+/**
+ * Field encoding of a Stellar address for the confidential_swap circuit's `recipient`
+ * public signal: int_be(sha256(xdr(address))) mod r. The shielded_pool contract recomputes
+ * this from the on-chain recipient Address (see `recipient_field` in lib.rs) and rejects any
+ * unshield whose passed recipient doesn't match — binding the destination into the proof so a
+ * relayer cannot redirect funds. MUST stay bit-for-bit identical to the contract.
+ */
+export function addressToField(address: string): bigint {
+    const xdrBytes = Address.fromString(address).toScVal().toXDR(); // ScVal(Address) raw XDR
+    const h = hash(xdrBytes); // sha256, 32 bytes
+    let v = 0n;
+    for (const b of h) v = (v << 8n) | BigInt(b);
+    return v % BN254_R;
+}
 
 // Validates a Stellar public key (G... address, 56 chars)
 function isValidStellarAddress(address: string): boolean {
