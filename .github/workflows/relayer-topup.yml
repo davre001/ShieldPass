@@ -20,19 +20,16 @@ jobs:
             exit 1
           fi
 
-          echo "Topping up relayer..."
-          # Don't use -f: friendbot returns a non-2xx for some already-funded states even
-          # though it's harmless. Capture the body and decide from its JSON instead.
-          RESPONSE=$(curl -s "https://friendbot.stellar.org?addr=$RELAYER")
-          echo "$RESPONSE" | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-except Exception:
-    print('friendbot returned non-JSON; treating as transient, not failing.'); sys.exit(0)
-if d.get('successful') or d.get('hash'):
-    print('Top-up tx:', d.get('hash', 'unknown'))
-else:
-    # e.g. account already funded — informational, not a failure.
-    print('friendbot note:', (d.get('detail') or d.get('title') or 'no funding performed'))
-"
+          echo "Topping up relayer via friendbot..."
+          # No -f: friendbot returns a non-2xx for already-funded accounts, which is harmless.
+          # Pure shell (no embedded python) to keep the YAML valid; the step never fails on a
+          # non-2xx — only an unset address aborts above.
+          code=$(curl -s -o response.json -w "%{http_code}" "https://friendbot.stellar.org?addr=$RELAYER")
+          echo "friendbot HTTP $code"
+          cat response.json 2>/dev/null || true
+          echo
+          if grep -q '"hash"' response.json 2>/dev/null; then
+            echo "Top-up succeeded."
+          else
+            echo "No funding performed (account likely already funded) — treating as success."
+          fi
