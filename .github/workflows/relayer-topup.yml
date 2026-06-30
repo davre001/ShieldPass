@@ -9,27 +9,26 @@ jobs:
   topup:
     runs-on: ubuntu-latest
     steps:
-      - name: Top up relayer via friendbot
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Top up relayer (friendbot a fresh account, merge it into the relayer)
         env:
-          # The relayer ADDRESS is public, so it may be stored as a repo Variable OR a Secret.
-          # Read whichever is set (Variable wins) so the workflow can't break on storage choice.
+          # The relayer ADDRESS is public, so it may live as a repo Variable OR a Secret.
           RELAYER: ${{ vars.STELLAR_RELAYER_ADDRESS || secrets.STELLAR_RELAYER_ADDRESS }}
         run: |
           if [ -z "$RELAYER" ]; then
             echo "STELLAR_RELAYER_ADDRESS not set as a Variable or Secret — aborting."
             exit 1
           fi
-
-          echo "Topping up relayer via friendbot..."
-          # No -f: friendbot returns a non-2xx for already-funded accounts, which is harmless.
-          # Pure shell (no embedded python) to keep the YAML valid; the step never fails on a
-          # non-2xx — only an unset address aborts above.
-          code=$(curl -s -o response.json -w "%{http_code}" "https://friendbot.stellar.org?addr=$RELAYER")
-          echo "friendbot HTTP $code"
-          cat response.json 2>/dev/null || true
-          echo
-          if grep -q '"hash"' response.json 2>/dev/null; then
-            echo "Top-up succeeded."
-          else
-            echo "No funding performed (account likely already funded) — treating as success."
-          fi
+          # Install the SDK in a scratch dir (keeps it out of the repo workspaces), copy the
+          # committed script next to it, and run. ESM resolves '@stellar/stellar-sdk' from cwd.
+          mkdir -p /tmp/topup
+          cp scripts/relayer-topup.mjs /tmp/topup/relayer-topup.mjs
+          cd /tmp/topup
+          npm init -y >/dev/null 2>&1
+          npm install @stellar/stellar-sdk@14 --no-audit --no-fund
+          node relayer-topup.mjs
