@@ -10,15 +10,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Top up relayer via friendbot
+        env:
+          # Stored as a repository SECRET (not a Variable), so read it from secrets.
+          RELAYER: ${{ secrets.STELLAR_RELAYER_ADDRESS }}
         run: |
-          RELAYER="${{ vars.STELLAR_RELAYER_ADDRESS }}"
-
           if [ -z "$RELAYER" ]; then
-            echo "STELLAR_RELAYER_ADDRESS variable not set — aborting."
+            echo "STELLAR_RELAYER_ADDRESS secret not set — aborting."
             exit 1
           fi
 
-          echo "Topping up $RELAYER..."
-          RESPONSE=$(curl -sf "https://friendbot.stellar.org?addr=$RELAYER")
-          TX=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('hash','unknown'))")
-          echo "Top-up tx: $TX"
+          echo "Topping up relayer..."
+          # Don't use -f: friendbot returns a non-2xx for some already-funded states even
+          # though it's harmless. Capture the body and decide from its JSON instead.
+          RESPONSE=$(curl -s "https://friendbot.stellar.org?addr=$RELAYER")
+          echo "$RESPONSE" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print('friendbot returned non-JSON; treating as transient, not failing.'); sys.exit(0)
+if d.get('successful') or d.get('hash'):
+    print('Top-up tx:', d.get('hash', 'unknown'))
+else:
+    # e.g. account already funded — informational, not a failure.
+    print('friendbot note:', (d.get('detail') or d.get('title') or 'no funding performed'))
+"
