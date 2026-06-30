@@ -23,10 +23,13 @@ services:
     plan: free
     region: oregon
     branch: main
+    # Install ONCE at the workspace root (this is an npm-workspaces monorepo). Per-package
+    # `cd SDK && npm install` fails with "Invalid Version" on a fresh clone; a single root
+    # install resolves all workspaces from the committed lockfile. Then build each package.
     buildCommand: >-
-      cd SDK && npm install --include=dev --no-audit --no-fund && npx tsc &&
-      cp ../frontend/public/reusable_kyc.json dist/reusable_kyc.json &&
-      cd ../backend && npm install --include=dev --no-audit --no-fund && npx prisma generate &&
+      npm install --include=dev --no-audit --no-fund &&
+      cd SDK && npx tsc && cp ../frontend/public/reusable_kyc.json dist/reusable_kyc.json &&
+      cd ../backend && npx prisma generate &&
       npx prisma db push --accept-data-loss && npm run build
     startCommand: cd backend && npm start
     envVars:
@@ -39,6 +42,11 @@ services:
         value: https://channels.openzeppelin.com/testnet
       - key: XLM_SAC_ADDRESS
         value: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
+      - key: USDC_SAC_ADDRESS
+        value: CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA
+      # USDC shielded pool (enables shielded USDC). Non-secret contract id.
+      - key: USDC_POOL_CONTRACT_ID
+        value: CCRQD3ALTYX5GMSQA5GDN65CF3DPLLHPWOOKHQOKRDO3JNK3FVYDM7ZP
       # Secrets — set these in the Render dashboard (sync: false keeps them out of the repo)
       - key: NEON_CONNECTION_STRING
         sync: false

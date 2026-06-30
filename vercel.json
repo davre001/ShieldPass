@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd SDK && npm install --include=dev --no-audit --no-fund && npx tsc && cp ../frontend/public/reusable_kyc.json dist/reusable_kyc.json && cd ../frontend && npm install --include=dev --no-audit --no-fund && npm run build",
+  "buildCommand": "npm install --include=dev --no-audit --no-fund && cd SDK && npx tsc && cp ../frontend/public/reusable_kyc.json dist/reusable_kyc.json && cd ../frontend && npm run build",
   "installCommand": "echo 'install handled in buildCommand'",
   "outputDirectory": "frontend/dist",
   "framework": null,
