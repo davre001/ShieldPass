@@ -11,11 +11,12 @@ jobs:
     steps:
       - name: Top up relayer via friendbot
         env:
-          # Stored as a repository SECRET (not a Variable), so read it from secrets.
-          RELAYER: ${{ secrets.STELLAR_RELAYER_ADDRESS }}
+          # The relayer ADDRESS is public, so it may be stored as a repo Variable OR a Secret.
+          # Read whichever is set (Variable wins) so the workflow can't break on storage choice.
+          RELAYER: ${{ vars.STELLAR_RELAYER_ADDRESS || secrets.STELLAR_RELAYER_ADDRESS }}
         run: |
           if [ -z "$RELAYER" ]; then
-            echo "STELLAR_RELAYER_ADDRESS secret not set — aborting."
+            echo "STELLAR_RELAYER_ADDRESS not set as a Variable or Secret — aborting."
             exit 1
           fi
 
