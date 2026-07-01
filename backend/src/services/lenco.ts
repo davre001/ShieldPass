@@ -72,3 +72,27 @@ export async function initiateTransfer(input: LencoTransferInput): Promise<Lenco
     return { ok: false, transferId: '', status: 'failed', error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+export interface ResolveResult { ok: boolean; accountName?: string; error?: string }
+
+/**
+ * Name enquiry: resolve an account number + bank code to the account holder's name so the user can
+ * confirm the recipient BEFORE paying (prevents sending to the wrong account). In mock mode we
+ * return a placeholder so the flow is testable without live credentials.
+ */
+export async function resolveAccount(accountNumber: string, bankCode: string): Promise<ResolveResult> {
+  const mode = fiatMode();
+  if (mode === 'mock') return { ok: true, accountName: 'TEST RECIPIENT (mock)' };
+  if (!LENCO_API_KEY) return { ok: false, error: 'LENCO_API_KEY is required to resolve account names.' };
+  try {
+    const url = `${LENCO_API_URL}/resolve?accountNumber=${encodeURIComponent(accountNumber)}&bankCode=${encodeURIComponent(bankCode)}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${LENCO_API_KEY}` } });
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: data?.message || `Lenco resolve failed (${res.status})` };
+    const name = data?.data?.accountName ?? data?.data?.name ?? data?.accountName ?? data?.name;
+    if (!name) return { ok: false, error: 'Could not resolve account name for that number + bank.' };
+    return { ok: true, accountName: String(name) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

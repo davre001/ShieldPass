@@ -57,6 +57,10 @@ export const api = {
   quote: (input: { tokenAddress: string; cryptoAmount: number; assetCode?: string }) =>
     request<Quote>("/swap/quote", { method: "POST", body: JSON.stringify(input) }),
 
+  // Name enquiry: account number + bank code -> account holder name (confirm recipient before paying).
+  resolveAccount: (input: { accountNumber: string; bankCode: string }) =>
+    request<{ accountName: string }>("/swap/resolve-account", { method: "POST", body: JSON.stringify(input) }),
+
   executeSwap: (input: {
     email: string;
     ephemeralBankDetails: { accountNumber: string; bankName: string; accountName: string };

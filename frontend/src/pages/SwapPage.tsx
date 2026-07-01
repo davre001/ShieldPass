@@ -79,6 +79,8 @@ export default function SwapPage() {
   const [bankCode, setBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
   const [addingBank, setAddingBank] = useState(false);
   const [isBankDropdownOpen, setIsBankDropdownOpen] = useState(false);
   const [isSavedBankDropdownOpen, setIsSavedBankDropdownOpen] = useState(false);
@@ -130,9 +132,26 @@ export default function SwapPage() {
     return () => clearTimeout(delay);
   }, [cryptoAmount, assetType]);
 
+  // Name enquiry: once a 10-digit account number + bank are entered, resolve the holder's name so
+  // the user confirms the recipient before saving (prevents wrong-account payouts). Debounced.
+  useEffect(() => {
+    setResolveError(null);
+    setAccountName("");
+    if (!bankCode || !/^\d{10}$/.test(accountNumber)) { setResolving(false); return; }
+    let cancelled = false;
+    setResolving(true);
+    const t = setTimeout(() => {
+      api.resolveAccount({ accountNumber, bankCode })
+        .then((r) => { if (!cancelled) setAccountName(r.accountName); })
+        .catch((err: any) => { if (!cancelled) setResolveError(err?.message || "Could not verify this account."); })
+        .finally(() => { if (!cancelled) setResolving(false); });
+    }, 500);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [accountNumber, bankCode]);
+
   async function handleAddBank() {
     if (!bankCode || !/^\d{10}$/.test(accountNumber) || accountName.trim().length < 2) {
-      setActionError("Please fill out all bank details correctly.");
+      setActionError("Enter a valid bank + 10-digit account number, and wait for the name to verify.");
       return;
     }
     const bankName = NIGERIAN_BANKS.find(b => b.code === bankCode)?.name || bankCode;
@@ -453,9 +472,20 @@ export default function SwapPage() {
                   </AnimatePresence>
                 </div>
                 <input className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white outline-none text-sm placeholder:text-white/20 transition-colors focus:border-indigo-500 focus:bg-white/10" maxLength={10} value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, ""))} placeholder="10-digit Account Number" />
-                <input className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white outline-none text-sm placeholder:text-white/20 transition-colors focus:border-indigo-500 focus:bg-white/10" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Account Holder Name" />
+                {/* Auto-resolved account name (name enquiry) — read-only so the user can't mistype it */}
+                <div className={`w-full rounded-lg px-3 py-2 text-sm min-h-[38px] flex items-center border transition-colors ${accountName ? 'border-emerald-500/30 bg-emerald-500/[0.04]' : resolveError ? 'border-red-500/30 bg-red-500/[0.03]' : 'border-white/10 bg-white/5'}`}>
+                  {resolving ? (
+                    <span className="text-indigo-300 animate-pulse">Verifying account…</span>
+                  ) : accountName ? (
+                    <span className="text-emerald-300 font-medium truncate">✓ {accountName}</span>
+                  ) : resolveError ? (
+                    <span className="text-red-400/80">{resolveError}</span>
+                  ) : (
+                    <span className="text-white/25">Account name appears here once the number + bank are entered</span>
+                  )}
+                </div>
                 <div className="flex gap-2 mt-2">
-                  <button onClick={handleAddBank} disabled={addingBank} className="flex-1 bg-white/10 hover:bg-white/20 text-white text-xs py-2 rounded-lg transition-all">{addingBank ? "Saving..." : "Save Bank"}</button>
+                  <button onClick={handleAddBank} disabled={addingBank || resolving || !accountName} className="flex-1 bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs py-2 rounded-lg transition-all">{addingBank ? "Saving..." : "Save Bank"}</button>
                   {banks.length > 0 && <button onClick={() => setShowAddBank(false)} className="px-4 text-white/50 hover:text-white text-xs transition-colors">Cancel</button>}
                 </div>
               </div>

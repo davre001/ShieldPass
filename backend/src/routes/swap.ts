@@ -7,7 +7,7 @@ import { treeServiceFor } from '../services/tree';
 import { poolIdForAsset, defaultPoolId } from '../services/pools';
 import { notify } from './notifications';
 import { getQuote, TIER2_THRESHOLD_NAIRA, type Quote } from '../services/quote';
-import { initiateTransfer as initiateLencoTransfer, type LencoTransferResult } from '../services/lenco';
+import { initiateTransfer as initiateLencoTransfer, resolveAccount, type LencoTransferResult } from '../services/lenco';
 import { initiatePaystackTransfer } from '../services/paystack';
 
 const router = Router();
@@ -53,6 +53,17 @@ const NIGERIAN_BANKS = [
 ];
 
 // POST /swap/quote - Naira payout for any Stellar asset + whether it needs Tier 2 (BVN).
+// POST /swap/resolve-account - name enquiry: resolve account number + bank code to the account
+// holder's name so the user can confirm the recipient BEFORE paying (prevents wrong-account payouts).
+router.post('/resolve-account', async (req, res) => {
+  const { accountNumber, bankCode } = req.body;
+  if (!/^\d{10}$/.test(String(accountNumber || ''))) return res.status(400).json({ error: 'A valid 10-digit account number is required.' });
+  if (!bankCode) return res.status(400).json({ error: 'bankCode is required.' });
+  const r = await resolveAccount(String(accountNumber), String(bankCode));
+  if (!r.ok) return res.status(422).json({ error: r.error });
+  return res.json({ accountName: r.accountName });
+});
+
 router.post('/quote', async (req, res) => {
   const { tokenAddress, cryptoAmount, assetCode } = req.body;
   if (!tokenAddress) return res.status(400).json({ error: 'tokenAddress is required.' });
