@@ -502,7 +502,10 @@ export default function SwapPage() {
                       return (
                         <div className="flex items-center gap-3">
                           <img src={nBank?.logoUrl || `https://www.google.com/s2/favicons?domain=${nBank?.domain || 'bank.com'}&sz=128`} alt="" className="w-5 h-5 rounded-full bg-white/10 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
-                          <span className="font-medium">{sel?.bankName} - {sel?.accountNumber}</span>
+                          <div className="flex flex-col min-w-0 leading-tight">
+                            {sel?.accountName && <span className="font-medium truncate">{sel.accountName}</span>}
+                            <span className={sel?.accountName ? "text-xs text-white/40" : "font-medium"}>{sel?.bankName} · {sel?.accountNumber}</span>
+                          </div>
                         </div>
                       );
                     })() : (
@@ -530,7 +533,10 @@ export default function SwapPage() {
                               }}
                             >
                               <img src={nBank?.logoUrl || `https://www.google.com/s2/favicons?domain=${nBank?.domain || 'bank.com'}&sz=128`} alt="" className="w-6 h-6 rounded-full bg-white/5 shadow-sm object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
-                              <span className="text-sm text-white/90 font-medium">{b.bankName} - {b.accountNumber}</span>
+                              <div className="flex flex-col min-w-0 leading-tight">
+                                {b.accountName && <span className="text-sm text-white/90 font-medium truncate">{b.accountName}</span>}
+                                <span className={b.accountName ? "text-xs text-white/40" : "text-sm text-white/90 font-medium"}>{b.bankName} · {b.accountNumber}</span>
+                              </div>
                             </div>
                           );
                         })}
