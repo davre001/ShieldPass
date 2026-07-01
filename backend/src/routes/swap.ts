@@ -193,22 +193,14 @@ router.post('/execute', async (req, res) => {
   });
   await notify(email, 'WITHDRAW_FIAT', `NGN ${quote.nairaAmount.toLocaleString()} sent to ${bankName}`, { amount: String(quote.nairaAmount), asset: 'NGN' });
 
-  // 5. Assign the change note (already queued on-chain by confidential_swap) a leaf
-  // index in the tree. The browser will run the merkle_insert proof later via useInsertProof.
-  let changeLeafIndex: number | null = null;
-  if (changeCommitment) {
-    try {
-      const { index } = await treeServiceFor(poolId || defaultPoolId()).assignInsert(BigInt(changeCommitment));
-      changeLeafIndex = index;
-    } catch (e) {
-      console.error('[swap/execute] change-note assign failed:', e);
-    }
-  }
-
+  // 5. The change note was queued on-chain by confidential_swap, but it is NOT inserted here.
+  // The browser runs the full merkle_insert (assign -> prove -> confirm) via useInsertProof, so
+  // the change leaf actually LANDS on-chain and the backend tree only advances once it's confirmed.
+  // (Previously we pre-assigned the leaf here without ever landing it, which drifted the tree.)
   res.json({
     success: true,
     swap: completed,
-    changeLeafIndex,
+    changeLeafIndex: null,
     payout: { amountNaira: quote.nairaAmount, bank: `${bankName} ${accountNumber}`, transferId: transfer.transferId, processor: processorUsed },
     message: `NGN ${quote.nairaAmount.toLocaleString()} sent to ${bankName} ${accountNumber}. (Bank Details deleted from memory)`,
   });

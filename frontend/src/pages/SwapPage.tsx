@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { useSession } from "../lib/session";
 import ShieldedKeyGate from "../components/ShieldedKeyGate";
 import { useSwapProof } from "../lib/useSwapProof";
+import { useInsertProof } from "../lib/useInsertProof";
 import ErrorNotice from "../components/ErrorNotice";
 import { Buffer } from "buffer";
 import { encryptNote } from "@shieldpass/sdk/dist/identity";
@@ -58,6 +59,7 @@ export default function SwapPage() {
   const navigate = useNavigate();
   const session = useSession();
   const swapProof = useSwapProof(import.meta.env.VITE_API_URL as string);
+  const { insertProof } = useInsertProof();
 
   // Swap State
   const [assetType, setAssetType] = useState<string>(SUPPORTED_SWAP_ASSETS[0]?.code ?? "");
@@ -266,21 +268,25 @@ export default function SwapPage() {
         changeCommitment,
       });
 
-      // 4. Spend the note: drop it and add the change note (if any) as the new balance.
-      if (exec.changeLeafIndex !== null) {
-        const changeNotes = BigInt(pr.changeNote.amount) > 0n ? [{
+      // 4. Spend the note: drop it. If there's change, INSERT the change note on-chain
+      //    (assign -> prove -> confirm, in the browser) exactly like unshield does — so the leaf
+      //    actually lands and the backend tree only advances once it's confirmed. Previously the
+      //    change note was never inserted, which drifted the tree and broke every later spend.
+      if (BigInt(pr.changeNote.amount) > 0n) {
+        const { index } = await insertProof(changeCommitment, () => {}, token.poolContractId);
+        const changeNote = {
           amount: pr.changeNote.amount,
           asset: token.code,
           randomness: pr.changeNote.randomness,
-          leafIndex: exec.changeLeafIndex,
+          leafIndex: index,
           compliance: currentNote.compliance,
-          confirmed: true, // change leaf already inserted on-chain (changeLeafIndex resolved)
-        }] : [];
-        session.set({ notes: [...session.notes.filter((n) => n !== currentNote), ...changeNotes] });
+          confirmed: true, // insertProof above landed this leaf on-chain
+        };
+        session.set({ notes: [...session.notes.filter((n) => n !== currentNote), changeNote] });
 
         // Publish a SELF-addressed recovery blob for the change note so the shielded balance
         // survives logout / a new device (the note scanner rebuilds from these blobs).
-        if (BigInt(pr.changeNote.amount) > 0n && session.identity) {
+        if (session.identity) {
           try {
             const plaintext = new TextEncoder().encode(JSON.stringify({
               amount: pr.changeNote.amount, randomness: pr.changeNote.randomness,
@@ -296,6 +302,9 @@ export default function SwapPage() {
             console.warn("[swap] change recovery blob publish failed:", e);
           }
         }
+      } else {
+        // Fully spent — just drop the note.
+        session.set({ notes: session.notes.filter((n) => n !== currentNote) });
       }
 
       setSwapSuccess({ message: `Success! ${exec.message}`, txHash: swapRes.hash });

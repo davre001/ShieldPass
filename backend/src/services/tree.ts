@@ -60,18 +60,34 @@ class TreeService {
         return { root: this.tree.root().toString(), nextIndex: this.tree.nextIndex };
     }
 
-    /** Sibling path + index bits for the leaf at `index` (for membership proofs). */
+    /**
+     * Sibling path + index bits for the leaf at `index` (for membership proofs).
+     *
+     * Built from CONFIRMED (on-chain-landed) leaves only, so a leaf that was assigned but never
+     * inserted on-chain (e.g. a stuck change note) can never poison the root a spend proof commits
+     * to. The returned root therefore always equals the on-chain current_root — the only root the
+     * contract accepts — which stops the recurring "unknown merkle root" trap at its source.
+     */
     async pathFor(index: number): Promise<{ siblings: string[]; indices: string[]; root: string }> {
-        await this.ensureLoaded();
-        // Refuse to serve a membership path when the DB tree has drifted from the on-chain tree —
-        // otherwise the proof references a root the contract never attested and every unshield/swap
-        // traps on-chain with a cryptic UnreachableCodeReached. Fail fast with a clear message.
+        const confirmed = await prisma.treeLeaf.findMany({
+            where: { poolId: this.poolId, status: 'confirmed' },
+            orderBy: { index: 'asc' },
+            select: { index: true, commitment: true },
+        });
+        if (index >= confirmed.length) {
+            throw new Error(`[tree] leaf ${index} is not yet confirmed on-chain in pool ${this.poolId} — cannot build a spendable membership proof.`);
+        }
+        const tree = new IncrementalMerkleTree(DEPTH);
+        for (const l of confirmed) tree.setLeaf(l.index, BigInt(l.commitment));
+        (tree as unknown as { count: number }).count = confirmed.length;
+        // Belt-and-suspenders: verify this confirmed-only root actually matches on-chain before we
+        // hand it out; if the DB itself is corrupt, fail loudly instead of serving a dead root.
         await this.assertSyncedWithChain();
-        const siblings = this.tree.path(index).map(String);
+        const siblings = tree.path(index).map(String);
         const indices: string[] = [];
         let idx = index;
         for (let i = 0; i < DEPTH; i++) { indices.push(String(idx & 1)); idx = Math.floor(idx / 2); }
-        return { siblings, indices, root: this.tree.root().toString() };
+        return { siblings, indices, root: tree.root().toString() };
     }
 
     /** Look up the index of a known commitment in this pool (so the client can fetch its path). */
@@ -186,7 +202,17 @@ class TreeService {
         const pool = new ShieldedPoolClient(RPC_URL, NETWORK, this.poolId);
         const txHash = await pool.insert(proof, publicSignals, Keypair.fromSecret(RELAYER_SECRET));
         await pool.waitForLanding(txHash);
-        console.log(`[tree/confirm] pool=${this.poolId} index=${index} tx=${txHash}`);
+
+        // Lock the DB to on-chain reality: the contract's current_root must now equal the new_root
+        // this insert proved (public_signals[1]). If it doesn't, the insert didn't land the way we
+        // think — do NOT mark the leaf confirmed, because recording a leaf the chain didn't actually
+        // accept is exactly what corrupts the tree and breaks every later spend.
+        const expectedRoot = BigInt('0x' + Buffer.from(publicSignals[1]).toString('hex'));
+        const chainRoot = BigInt('0x' + Buffer.from(await pool.currentRoot()).toString('hex'));
+        if (chainRoot !== expectedRoot) {
+            throw new Error(`[tree/confirm] pool=${this.poolId} index=${index}: on-chain root ${chainRoot} != inserted new_root ${expectedRoot} — refusing to confirm (tree would diverge).`);
+        }
+        console.log(`[tree/confirm] pool=${this.poolId} index=${index} tx=${txHash} (root verified against chain)`);
 
         await prisma.treeLeaf.update({ where: { poolId_index: { poolId: this.poolId, index } }, data: { status: 'confirmed' } });
         return { txHash };
