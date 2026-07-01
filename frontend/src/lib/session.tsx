@@ -27,6 +27,11 @@ interface SessionState {
   address: string | null // C-address smart wallet
   bvnVerified: boolean
   notes: ShieldedNote[] // shielded balance = sum of these notes (faucet seed + deposits + change)
+  // A new-account faucet note that is still settling on-chain in the background. Held here (not in
+  // `notes`) so it does NOT count toward the shielded balance until it settles — the poll hook
+  // (usePendingFaucet) proves + inserts it, then moves it into `notes`. Cleared on settle/timeout.
+  pendingFaucet: { commitment: string; amount: string; randomness: string; asset: string;
+    compliance: { hardware_attested: string; bvn_verified: string; good_standing: string } } | null
 }
 
 export interface Session extends SessionState {
@@ -37,6 +42,8 @@ export interface Session extends SessionState {
   reset: () => void
   /** Re-derive shielded identity from PIN after a page reload (no passkey prompt). */
   unlockIdentityWithPin: (pin: string) => Promise<void>
+  /** Unlock the shielded identity with the device passkey (Face ID / fingerprint) via the PRF wrap. */
+  unlockIdentityWithPasskey: () => Promise<void>
 }
 
 const EMPTY: SessionState = {
@@ -44,7 +51,7 @@ const EMPTY: SessionState = {
   secretSalt: null, merkleRoot: null,
   wallet: null, identity: null, shieldedAddress: null,
   credentialId: '', address: null,
-  bvnVerified: false, notes: [],
+  bvnVerified: false, notes: [], pendingFaucet: null,
 }
 
 const STORAGE_KEY = 'shieldpass_session'
@@ -172,6 +179,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // before committing it — otherwise reject so the UI can show "incorrect PIN".
       if (state.shieldedAddress && identity.address !== state.shieldedAddress) {
         throw new Error('Incorrect PIN — could not unlock your shielded key.')
+      }
+      await unlockBankVault(seed, email)
+      setState(s => { const next = { ...s, identity }; savePersisted(next); return next })
+    },
+    unlockIdentityWithPasskey: async () => {
+      const email = state.email
+      if (!email) throw new Error('No account in this session — log in from the start screen.')
+      const { unlockSeedWithPasskey, deriveIdentityFromSeed } = await import('./shieldedKey')
+      const { unlockBankVault } = await import('./bankVault')
+      // Face ID / fingerprint → PRF → decrypt the enrolled seed wrap. Same guard as PIN: the
+      // derived identity must match the persisted shp_ address, else reject.
+      const seed = await unlockSeedWithPasskey(email, state.credentialId || undefined)
+      const identity = deriveIdentityFromSeed(seed)
+      if (state.shieldedAddress && identity.address !== state.shieldedAddress) {
+        throw new Error('Could not unlock your shielded key with this passkey.')
       }
       await unlockBankVault(seed, email)
       setState(s => { const next = { ...s, identity }; savePersisted(next); return next })

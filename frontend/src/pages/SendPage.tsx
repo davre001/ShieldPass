@@ -12,6 +12,7 @@ import ErrorNotice from "../components/ErrorNotice";
 import { PUBLIC_ASSETS, assetByCode, formatUnits, parseUnits } from "../lib/assets";
 import { useWalletBalance } from "../lib/useWalletBalance";
 import { useInsertProof } from "../lib/useInsertProof";
+import { encryptNote } from "@shieldpass/sdk/dist/identity";
 import { StellarContractClient, addressToField } from "@shieldpass/sdk/dist/stellar";
 
 const RPC_URL = import.meta.env.VITE_RPC_URL || "https://soroban-testnet.stellar.org";
@@ -178,6 +179,27 @@ export default function SendPage() {
     }] : [];
 
     session.set({ notes: [...session.notes.filter((n) => n !== note), ...changeNotes] });
+
+    // Publish a SELF-addressed recovery blob for the change note so our shielded balance survives
+    // logout / a new device (the note scanner rebuilds from these blobs). Without it, unshield
+    // change notes live only in localStorage and vanish on session reset.
+    if (BigInt(pr.changeNote.amount) > 0n && session.identity) {
+      try {
+        const plaintext = new TextEncoder().encode(JSON.stringify({
+          amount: pr.changeNote.amount, randomness: pr.changeNote.randomness,
+          compliance: note.compliance, asset: note.asset,
+        }));
+        const enc = encryptNote(session.identity.encPublic, plaintext);
+        await api.postNoteBlob({
+          commitment: changeCommitment,
+          ephemeralPub: Buffer.from(enc.ephemeralPublic).toString("hex"),
+          ciphertext: Buffer.from(enc.ciphertext).toString("hex"),
+        });
+      } catch (e) {
+        console.warn("[unshield] change recovery blob publish failed:", e);
+      }
+    }
+
     setSuccess({ message: `Sent ${formatUnits(amt, selectedAsset.decimals, 4)} ${note.asset} to ${short(to)} (now public).`, txHash: unshieldSendRes.hash });
     api.notify({ email: session.email, type: "UNSHIELD", title: "Sent to wallet", amount: formatUnits(amt, selectedAsset.decimals, 4), asset: note.asset, txHash: unshieldSendRes.hash }).catch(() => {});
   }

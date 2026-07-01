@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { Buffer } from "buffer";
 import { fieldToBytes32 } from "@shieldpass/sdk/dist/groth16Prover";
 import { noteCommitment, type Compliance } from "@shieldpass/sdk/dist/notes";
+import { encryptNote } from "@shieldpass/sdk/dist/identity";
 import { api } from "../lib/api";
 import { useSession } from "../lib/session";
 import { useSwapProof } from "../lib/useSwapProof";
@@ -91,13 +92,32 @@ export default function DepositPage() {
     // Pool-scoped so the leaf lands in THIS asset's tree.
     const { index: leafIndex } = await insertProof(commitment.toString(), setStatus, selectedAsset.poolContractId);
 
+    const noteCompliance = { hardware_attested: "1", bvn_verified: session.bvnVerified ? "1" : "0", good_standing: "1" };
     session.set({
       notes: [...session.notes, {
         amount: amt.toString(), asset: selectedAsset.code, randomness, leafIndex,
-        compliance: { hardware_attested: "1", bvn_verified: session.bvnVerified ? "1" : "0", good_standing: "1" },
+        compliance: noteCompliance,
         confirmed: true, // insertProof above already landed this leaf on-chain
       }],
     });
+
+    // Publish a SELF-addressed recovery blob so this shielded note survives logout / a new device.
+    // Without it, shield-deposit notes live only in localStorage and are lost when the session
+    // resets (the note scanner rebuilds the balance by trial-decrypting these blobs).
+    try {
+      const plaintext = new TextEncoder().encode(JSON.stringify({
+        amount: amt.toString(), randomness, compliance: noteCompliance, asset: selectedAsset.code,
+      }));
+      const enc = encryptNote(session.identity.encPublic, plaintext);
+      await api.postNoteBlob({
+        commitment: commitment.toString(),
+        ephemeralPub: Buffer.from(enc.ephemeralPublic).toString("hex"),
+        ciphertext: Buffer.from(enc.ciphertext).toString("hex"),
+      });
+    } catch (e) {
+      console.warn("[shield] recovery blob publish failed (note still usable this session):", e);
+    }
+
     setSuccess({ message: `Shielded ${formatUnits(amt, selectedAsset.decimals, 4)} ${selectedAsset.code} into your private balance.`, txHash: depositRes.hash });
     api.notify({ email: session.email, type: "SHIELD", title: "Shielded funds", amount: formatUnits(amt, selectedAsset.decimals, 4), asset: selectedAsset.code, txHash: depositRes.hash }).catch(() => {});
   }

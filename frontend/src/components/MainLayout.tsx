@@ -5,6 +5,7 @@ import { GradientBackground } from "./ui/paper-design-shader-background";
 import { DarkBackground } from "./ui/background-snippets";
 import { useSession } from "../lib/session";
 import { useNoteScanner } from "../lib/useNoteScanner";
+import { usePendingFaucet } from "../lib/usePendingFaucet";
 import { useIncomingTransactions } from "../lib/useIncomingTransactions";
 import { api } from "../lib/api";
 import { assetByCode, formatUnits } from "../lib/assets";
@@ -26,6 +27,9 @@ export default function MainLayout({
   const currentPath = location.pathname;
   const isActive = (path: string) => currentPath === path;
   const session = useSession();
+
+  // Settle a new-account faucet note that's still confirming on-chain, then reveal it once real.
+  usePendingFaucet();
 
   // Background scan for incoming private (shielded) payments.
   useNoteScanner(import.meta.env.VITE_API_URL as string, (amount, asset) => {

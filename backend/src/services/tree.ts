@@ -63,6 +63,10 @@ class TreeService {
     /** Sibling path + index bits for the leaf at `index` (for membership proofs). */
     async pathFor(index: number): Promise<{ siblings: string[]; indices: string[]; root: string }> {
         await this.ensureLoaded();
+        // Refuse to serve a membership path when the DB tree has drifted from the on-chain tree —
+        // otherwise the proof references a root the contract never attested and every unshield/swap
+        // traps on-chain with a cryptic UnreachableCodeReached. Fail fast with a clear message.
+        await this.assertSyncedWithChain();
         const siblings = this.tree.path(index).map(String);
         const indices: string[] = [];
         let idx = index;
@@ -82,27 +86,50 @@ class TreeService {
     // ── Chain sync guard ─────────────────────────────────────────────────────
 
     /**
-     * Verify the in-memory tree's nextIndex matches the on-chain contract.
-     * If they diverge (e.g. DB was cleared without redeploying the contract),
-     * throw immediately so the caller gets a clear error instead of submitting
-     * a proof built against the wrong old_root.
+     * Verify the in-memory tree matches the on-chain contract — in BOTH leaf count AND root.
+     * If they diverge, throw immediately so the caller gets a clear error instead of submitting a
+     * proof built against a root the contract never attested (which traps on-chain with an opaque
+     * UnreachableCodeReached on every unshield/swap/insert).
+     *
+     * Checking the root (not just the count) is essential: a DB with the SAME number of leaves but
+     * DIFFERENT commitments than on-chain (e.g. leftover leaves from a redeployed contract) passes
+     * a count check yet produces a root that is not a ValidRoot on-chain — silently breaking every
+     * private operation. That exact divergence is what this guard now catches.
      */
     private async assertSyncedWithChain(): Promise<void> {
         if (!this.poolId || !RELAYER_SECRET) return;
         try {
             const pool = new ShieldedPoolClient(RPC_URL, NETWORK, this.poolId);
             const chainIndex = await pool.nextIndex();
-            // Compare CONFIRMED DB leaves only — pending leaves are legitimately
-            // ahead of the chain (they are in-flight proofs, not committed yet).
-            const confirmedCount = await prisma.treeLeaf.count({
+            // Compare CONFIRMED DB leaves only — pending leaves are legitimately ahead of the
+            // chain (they are in-flight proofs, not committed yet).
+            const confirmed = await prisma.treeLeaf.findMany({
                 where: { poolId: this.poolId, status: 'confirmed' },
+                orderBy: { index: 'asc' },
+                select: { index: true, commitment: true },
             });
-            if (chainIndex !== confirmedCount) {
+            if (chainIndex !== confirmed.length) {
                 throw new Error(
-                    `[tree] DIVERGED (pool ${this.poolId}): DB has ${confirmedCount} confirmed leaves, chain has ${chainIndex}. ` +
+                    `[tree] DIVERGED (pool ${this.poolId}): DB has ${confirmed.length} confirmed leaves, chain has ${chainIndex}. ` +
                     `A previous insert tx likely failed after the DB was marked confirmed. ` +
                     `To recover without redeploying, run in Neon: ` +
                     `UPDATE "TreeLeaf" SET status='pending' WHERE "poolId"='${this.poolId}' AND status='confirmed' AND index >= ${chainIndex};`
+                );
+            }
+            // Same count — now confirm the CONTENT matches by comparing the confirmed-only root to
+            // the on-chain current_root. A mismatch means the DB leaves aren't the ones committed
+            // on-chain, so every membership proof would be rejected.
+            const confirmedTree = new IncrementalMerkleTree(DEPTH);
+            for (const l of confirmed) confirmedTree.setLeaf(l.index, BigInt(l.commitment));
+            (confirmedTree as unknown as { count: number }).count = confirmed.length;
+            const dbRoot = confirmedTree.root();
+            const chainRoot = BigInt('0x' + Buffer.from(await pool.currentRoot()).toString('hex'));
+            if (dbRoot !== chainRoot) {
+                throw new Error(
+                    `[tree] DIVERGED (pool ${this.poolId}): DB root ${dbRoot} != on-chain root ${chainRoot} ` +
+                    `(both ${confirmed.length} leaves). The backend tree does not match the deployed contract, ` +
+                    `so proofs will be rejected on-chain. Reset the tree (clear TreeLeaf for this pool and ` +
+                    `re-init/redeploy the pool), or rebuild TreeLeaf from the on-chain insert history.`
                 );
             }
         } catch (e: any) {
@@ -181,30 +208,52 @@ class TreeService {
     }
 
     /**
-     * Background, off the HTTP critical path: settle a faucet note on-chain (faucet pool only).
+     * Settle a faucet note on-chain (faucet pool only). A faucet MUST land unfailingly, so this
+     * self-heals: it retries the step(s) that didn't land and NEVER re-runs a step that already
+     * succeeded within this call (re-seeding a Pending commitment panics; fundWallet moves real
+     * crypto so re-funding would double-pay). Returns true only when the note is fully backed —
+     * the caller hands the user a shielded note ONLY on true, else falls back to a public seed.
      *  1. faucet_seed(commitment) — registers the note commitment as Pending (gas only).
      *  2. fundWallet(pool, faucetAmount) — backs the note with real crypto so it can be unshielded.
      */
-    async settleFaucetOnChain(commitment: bigint): Promise<void> {
-        if (!this.poolId || !RELAYER_SECRET) return;
+    async settleFaucetOnChain(commitment: bigint): Promise<boolean> {
+        if (!this.poolId || !RELAYER_SECRET) return false;
         if (!this.pool.faucet) {
             console.warn(`[tree/faucet] pool ${this.poolId} is not a faucet pool — skipping settle`);
-            return;
+            return false;
         }
         const pool = new ShieldedPoolClient(RPC_URL, NETWORK, this.poolId);
         const relayer = Keypair.fromSecret(RELAYER_SECRET);
+        const sac = this.pool.sacAddress;
+        const needsFunding = !!sac;
+        if (!needsFunding) console.warn('[tree/faucet] pool SAC not set — pool not funded, unshield will fail');
 
-        await pool.faucetSeed(fieldToBytes32(commitment), relayer);
-        console.log(`[tree/faucet] faucet_seed landed for commitment=${commitment}`);
-
-        if (this.pool.sacAddress) {
-            const stellar = new StellarContractClient(RPC_URL, NETWORK, this.pool.sacAddress);
-            const fundHash = await stellar.fundWallet(this.pool.sacAddress, this.poolId, this.pool.faucetAmount, relayer);
-            await pool.waitForLanding(fundHash);
-            console.log(`[tree/faucet] funded pool ${this.pool.faucetAmount} stroops tx=${fundHash}`);
-        } else {
-            console.warn('[tree/faucet] pool SAC not set — pool not funded, unshield will fail');
+        const MAX_ATTEMPTS = 3;
+        let seeded = false;
+        let funded = false;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                if (!seeded) {
+                    // faucetSeed waits for landing internally, so `seeded` only flips once it's on-chain.
+                    await pool.faucetSeed(fieldToBytes32(commitment), relayer);
+                    seeded = true;
+                    console.log(`[tree/faucet] faucet_seed landed for commitment=${commitment}`);
+                }
+                if (sac && !funded) {
+                    const stellar = new StellarContractClient(RPC_URL, NETWORK, sac);
+                    // fundWallet waits for landing internally (see SDK accountLock), so `funded`
+                    // only flips once the pool transfer is committed.
+                    const fundHash = await stellar.fundWallet(sac, this.poolId, this.pool.faucetAmount, relayer);
+                    funded = true;
+                    console.log(`[tree/faucet] funded pool ${this.pool.faucetAmount} stroops tx=${fundHash}`);
+                }
+                return needsFunding ? funded : seeded;
+            } catch (err) {
+                console.error(`[tree/faucet] settle attempt ${attempt}/${MAX_ATTEMPTS} failed:`, err instanceof Error ? err.message : err);
+                if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, 2000 * attempt));
+            }
         }
+        return needsFunding ? seeded && funded : seeded;
     }
 
     // ── Background cleanup ────────────────────────────────────────────────────

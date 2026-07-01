@@ -5,10 +5,9 @@ import { api } from "../lib/api";
 import { useSession } from "../lib/session";
 import { makeWallet } from "../lib/smartAccount";
 import { humanizeError } from "@shieldpass/sdk/dist/errors";
-import { deriveSeedFromPassword, deriveIdentityFromSeed } from "../lib/shieldedKey";
+import { deriveSeedFromPassword, deriveIdentityFromSeed, enrollPasskeyUnlock } from "../lib/shieldedKey";
 import { unlockBankVault } from "../lib/bankVault";
 import type { ShieldedIdentity } from "@shieldpass/sdk/dist/identity";
-import { proveAndConfirm } from "../lib/useInsertProof";
 
 import { AnimatedLayout } from "../components/ui/animated-characters-login-page";
 
@@ -34,6 +33,9 @@ export default function OnboardingPage() {
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Welcome-bonus state for the done card. 'settling' = the faucet is confirming on-chain in the
+  // background and will appear in the shielded balance once it's real (hide-until-settled).
+  const [welcomeBonus, setWelcomeBonus] = useState<'settling' | null>(null);
 
   const infoValid = /\S+@\S+\.\S+/.test(email) && /^\d{4,6}$/.test(pin);
 
@@ -56,8 +58,9 @@ export default function OnboardingPage() {
       }
 
       let wallet, credentialId, address, secretSalt, merkleRoot, bvnVerified = false;
-      let note: import('../lib/session').ShieldedNote | null = null;
+      let pendingFaucet: import('../lib/session').Session['pendingFaucet'] = null;
       let identity: ShieldedIdentity;
+      let shieldedSeed: Uint8Array | null = null;
       const toHex = (u8: Uint8Array) => Array.from(u8).map((b) => b.toString(16).padStart(2, '0')).join('');
 
       if (check?.ok && check.passkeyKeyId && check.smartWalletAddress) {
@@ -69,6 +72,7 @@ export default function OnboardingPage() {
         // Re-derive shielded identity from PIN — no second passkey prompt.
         const seed = await deriveSeedFromPassword(pin, email);
         identity = deriveIdentityFromSeed(seed);
+        shieldedSeed = seed;
         await unlockBankVault(seed, email);
 
         const reissue = await api.reissueSalt({ email, pin });
@@ -86,6 +90,7 @@ export default function OnboardingPage() {
         // Derive shielded identity from PIN — one passkey prompt total (just createWallet above).
         const seed = await deriveSeedFromPassword(pin, email);
         identity = deriveIdentityFromSeed(seed);
+        shieldedSeed = seed;
         await unlockBankVault(seed, email);
 
         const linkRes = await api.linkWallet({
@@ -94,30 +99,35 @@ export default function OnboardingPage() {
         });
         secretSalt = linkRes.secretSalt;
         merkleRoot = linkRes.merkleRoot;
-        if (linkRes.faucetNote) {
-          note = {
-            amount: linkRes.faucetNote.amount,
-            asset: linkRes.faucetNote.asset,
-            randomness: linkRes.faucetNote.randomness,
-            leafIndex: linkRes.faucetNote.leafIndex,
-            compliance: linkRes.faucetNote.compliance,
-            confirmed: false, // will flip to true once the proof lands on-chain
+        if (linkRes.faucetPending && linkRes.faucetSecret) {
+          // The faucet settles on-chain in the BACKGROUND. Stash the secret; the app-level
+          // usePendingFaucet hook polls until it's backed, then proves it in-browser and reveals
+          // the 500 in the shielded balance (hide-until-settled). Nothing shows until it's real.
+          pendingFaucet = {
+            commitment: linkRes.faucetSecret.commitment,
+            amount: linkRes.faucetSecret.amount,
+            randomness: linkRes.faucetSecret.randomness,
+            asset: linkRes.faucetSecret.asset,
+            compliance: linkRes.faucetSecret.compliance,
           };
-          // Generate and submit the merkle_insert proof in the browser (fire-and-forget).
-          // If the browser closes mid-proof, the session auto-retry effect will pick it
-          // up on the next page load via /tree/retry/:index.
-          const faucetIndex = linkRes.faucetNote.leafIndex;
-          proveAndConfirm(faucetIndex, linkRes.faucetNote.circuitInput)
-            .then(() => session.confirmNote(faucetIndex))
-            .catch((err) => console.warn('[onboarding] faucet proof failed:', err));
+          setWelcomeBonus('settling');
         }
       }
 
       session.set({
         wallet, identity, shieldedAddress: identity.address,
         credentialId, address, email, secretSalt, merkleRoot, bvnVerified,
-        notes: note ? [note] : [],
+        pendingFaucet,
+        // Do NOT wipe notes here: on login we keep any locally-persisted notes, and the note
+        // scanner rebuilds the rest from the encrypted blob store. (Previously this set notes:[]
+        // which scraped the shielded balance on every login.)
       });
+
+      // Enroll biometric unlock for the shielded key (best-effort, one attempt per device). Wraps
+      // the PIN-derived seed under the passkey PRF so future unlocks can use Face ID / fingerprint.
+      // Self-guards + swallows errors: no-op if already enrolled or if the passkey lacks PRF.
+      if (shieldedSeed) await enrollPasskeyUnlock(shieldedSeed, email, credentialId).catch(() => {});
+
       setStage("done");
     } catch (err) {
       setStage("error");
@@ -188,6 +198,14 @@ export default function OnboardingPage() {
                   <dt className="mb-2 text-white/40 uppercase tracking-wider text-[10px]">Smart wallet (passkey)</dt>
                   <dd className="break-all border border-white/5 bg-white/[0.01] p-3.5 rounded-lg text-white font-mono select-all">{session.address}</dd>
                 </div>
+                {welcomeBonus === 'settling' && (
+                  <div>
+                    <dt className="mb-2 text-white/40 uppercase tracking-wider text-[10px]">Welcome bonus</dt>
+                    <dd className="border border-white/5 bg-white/[0.01] p-3.5 rounded-lg text-white/80">
+                      500 XLM is confirming into your private shielded balance — it'll appear shortly.
+                    </dd>
+                  </div>
+                )}
               </dl>
               <button onClick={() => navigate("/swap")} className="mt-8 w-full font-semibold px-6 py-4 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-500/20 hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2">
                 Start Swapping

@@ -1,6 +1,7 @@
 import { rpc, Contract, Keypair, Networks, TransactionBuilder, Account, BASE_FEE, nativeToScVal, scValToNative, xdr, Address, hash } from '@stellar/stellar-sdk';
 import { LockSwapParams, Signer } from './types';
 import { isValidSorobanAddress } from './utils';
+import { withAccountLock, waitForLanding } from './accountLock';
 
 // BN254 scalar field order r — recipient field elements must be canonical (< r).
 const BN254_R = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
@@ -74,29 +75,34 @@ export class StellarContractClient {
             throw new Error('[StellarContractClient] Funding amount must be greater than zero.');
         }
 
-        const contract = new Contract(tokenId);
-        const accountInfo = await this.server.getAccount(sourceKeypair.publicKey());
-        const account = new Account(sourceKeypair.publicKey(), accountInfo.sequenceNumber());
+        // Serialize on the source account + hold through landing so this transfer never races
+        // another relayer tx for the same sequence number. See accountLock.ts.
+        return withAccountLock(sourceKeypair.publicKey(), async () => {
+            const contract = new Contract(tokenId);
+            const accountInfo = await this.server.getAccount(sourceKeypair.publicKey());
+            const account = new Account(sourceKeypair.publicKey(), accountInfo.sequenceNumber());
 
-        let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
-            .addOperation(contract.call(
-                'transfer',
-                nativeToScVal(sourceKeypair.publicKey(), { type: 'address' }),
-                nativeToScVal(to, { type: 'address' }),
-                nativeToScVal(amount, { type: 'i128' }),
-            ))
-            .setTimeout(30)
-            .build();
+            let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
+                .addOperation(contract.call(
+                    'transfer',
+                    nativeToScVal(sourceKeypair.publicKey(), { type: 'address' }),
+                    nativeToScVal(to, { type: 'address' }),
+                    nativeToScVal(amount, { type: 'i128' }),
+                ))
+                .setTimeout(30)
+                .build();
 
-        const sim = await this.server.simulateTransaction(tx);
-        if (!rpc.Api.isSimulationSuccess(sim)) {
-            throw new Error(`[StellarContractClient] fundWallet simulation failed: ${JSON.stringify(sim)}`);
-        }
-        tx = rpc.assembleTransaction(tx, sim).build();
-        tx.sign(sourceKeypair);
-        const sent = await this.server.sendTransaction(tx);
-        console.log(`[StellarContractClient] fundWallet submitted! Hash: ${sent.hash}`);
-        return sent.hash;
+            const sim = await this.server.simulateTransaction(tx);
+            if (!rpc.Api.isSimulationSuccess(sim)) {
+                throw new Error(`[StellarContractClient] fundWallet simulation failed: ${JSON.stringify(sim)}`);
+            }
+            tx = rpc.assembleTransaction(tx, sim).build();
+            tx.sign(sourceKeypair);
+            const sent = await this.server.sendTransaction(tx);
+            console.log(`[StellarContractClient] fundWallet submitted! Hash: ${sent.hash}`);
+            await waitForLanding(this.server, sent.hash);
+            return sent.hash;
+        });
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -110,24 +116,27 @@ export class StellarContractClient {
     async initSwap(adminAddress: string, signerKeypair: Keypair): Promise<string> {
         if (!isValidStellarAddress(adminAddress)) throw new Error('[StellarContractClient] Invalid admin address.');
 
-        const contract = new Contract(this.contractId);
-        const accountInfo = await this.server.getAccount(signerKeypair.publicKey());
-        const account = new Account(signerKeypair.publicKey(), accountInfo.sequenceNumber());
+        return withAccountLock(signerKeypair.publicKey(), async () => {
+            const contract = new Contract(this.contractId);
+            const accountInfo = await this.server.getAccount(signerKeypair.publicKey());
+            const account = new Account(signerKeypair.publicKey(), accountInfo.sequenceNumber());
 
-        let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
-            .addOperation(contract.call('init',
-                nativeToScVal(adminAddress, { type: 'address' }),
-            ))
-            .setTimeout(30)
-            .build();
+            let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
+                .addOperation(contract.call('init',
+                    nativeToScVal(adminAddress, { type: 'address' }),
+                ))
+                .setTimeout(30)
+                .build();
 
-        const sim = await this.server.simulateTransaction(tx);
-        if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[StellarContractClient] initSwap simulation failed: ${JSON.stringify(sim)}`);
-        tx = rpc.assembleTransaction(tx, sim).build();
-        tx.sign(signerKeypair);
-        const sent = await this.server.sendTransaction(tx);
-        console.log(`[StellarContractClient] initSwap submitted! Hash: ${sent.hash}`);
-        return sent.hash;
+            const sim = await this.server.simulateTransaction(tx);
+            if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[StellarContractClient] initSwap simulation failed: ${JSON.stringify(sim)}`);
+            tx = rpc.assembleTransaction(tx, sim).build();
+            tx.sign(signerKeypair);
+            const sent = await this.server.sendTransaction(tx);
+            console.log(`[StellarContractClient] initSwap submitted! Hash: ${sent.hash}`);
+            await waitForLanding(this.server, sent.hash);
+            return sent.hash;
+        });
     }
 
     /**
@@ -156,17 +165,22 @@ export class StellarContractClient {
         );
 
         if (signer.kind === 'keypair') {
-            const accountInfo = await this.server.getAccount(signer.keypair.publicKey());
-            const account = new Account(signer.keypair.publicKey(), accountInfo.sequenceNumber());
-            let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
-                .addOperation(op).setTimeout(30).build();
-            const sim = await this.server.simulateTransaction(tx);
-            if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[StellarContractClient] Simulation failed: ${JSON.stringify(sim)}`);
-            tx = rpc.assembleTransaction(tx, sim).build();
-            tx.sign(signer.keypair);
-            const sent = await this.server.sendTransaction(tx);
-            console.log(`[StellarContractClient] lock_swap submitted! Hash: ${sent.hash}`);
-            return { hash: sent.hash, swapId: await this.decodeU64Return(sent.hash) };
+            const kp = signer.keypair;
+            return withAccountLock(kp.publicKey(), async () => {
+                const accountInfo = await this.server.getAccount(kp.publicKey());
+                const account = new Account(kp.publicKey(), accountInfo.sequenceNumber());
+                let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
+                    .addOperation(op).setTimeout(30).build();
+                const sim = await this.server.simulateTransaction(tx);
+                if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[StellarContractClient] Simulation failed: ${JSON.stringify(sim)}`);
+                tx = rpc.assembleTransaction(tx, sim).build();
+                tx.sign(kp);
+                const sent = await this.server.sendTransaction(tx);
+                console.log(`[StellarContractClient] lock_swap submitted! Hash: ${sent.hash}`);
+                // decodeU64Return polls until SUCCESS, so it doubles as the landing wait that
+                // keeps the account lock held until the sequence number is consumed.
+                return { hash: sent.hash, swapId: await this.decodeU64Return(sent.hash) };
+            });
         }
 
         // passkey path — same pattern as createOffer: build+simulate+assemble, then the caller's
@@ -190,25 +204,28 @@ export class StellarContractClient {
     async claimSwap(swapId: bigint, adminKeypair: Keypair): Promise<string> {
         if (swapId <= 0n) throw new Error('[StellarContractClient] swapId must be a positive number.');
 
-        const contract = new Contract(this.contractId);
-        const accountInfo = await this.server.getAccount(adminKeypair.publicKey());
-        const account = new Account(adminKeypair.publicKey(), accountInfo.sequenceNumber());
+        return withAccountLock(adminKeypair.publicKey(), async () => {
+            const contract = new Contract(this.contractId);
+            const accountInfo = await this.server.getAccount(adminKeypair.publicKey());
+            const account = new Account(adminKeypair.publicKey(), accountInfo.sequenceNumber());
 
-        let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
-            .addOperation(contract.call(
-                'claim_swap',
-                nativeToScVal(swapId, { type: 'u64' }),
-            ))
-            .setTimeout(30)
-            .build();
+            let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
+                .addOperation(contract.call(
+                    'claim_swap',
+                    nativeToScVal(swapId, { type: 'u64' }),
+                ))
+                .setTimeout(30)
+                .build();
 
-        const sim = await this.server.simulateTransaction(tx);
-        if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[StellarContractClient] claim_swap simulation failed: ${JSON.stringify(sim)}`);
-        tx = rpc.assembleTransaction(tx, sim).build();
-        tx.sign(adminKeypair);
-        const sent = await this.server.sendTransaction(tx);
-        console.log(`[StellarContractClient] claim_swap submitted! Hash: ${sent.hash}`);
-        return sent.hash;
+            const sim = await this.server.simulateTransaction(tx);
+            if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[StellarContractClient] claim_swap simulation failed: ${JSON.stringify(sim)}`);
+            tx = rpc.assembleTransaction(tx, sim).build();
+            tx.sign(adminKeypair);
+            const sent = await this.server.sendTransaction(tx);
+            console.log(`[StellarContractClient] claim_swap submitted! Hash: ${sent.hash}`);
+            await waitForLanding(this.server, sent.hash);
+            return sent.hash;
+        });
     }
 
     /** Poll getTransaction until SUCCESS, then decode a u64 return value (a swap/offer id). */

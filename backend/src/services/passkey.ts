@@ -1,5 +1,6 @@
 import { ChannelsClient } from '@openzeppelin/relayer-plugin-channels';
 import { Keypair, Transaction, TransactionBuilder, Account, Operation, BASE_FEE, hash, rpc, xdr } from '@stellar/stellar-sdk';
+import { withAccountLock, waitForLanding } from '@shieldpass/sdk';
 
 const NETWORK = process.env.STELLAR_NETWORK_PASSPHRASE || 'Test SDF Network ; September 2015';
 const RPC_URL = process.env.STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org';
@@ -166,20 +167,28 @@ async function submitFuncViaRelayer(funcB64: string, authB64: string[]): Promise
   const authEntries = authB64.map((a) => xdr.SorobanAuthorizationEntry.fromXDR(a, 'base64'));
   const op = Operation.invokeHostFunction({ func: hostFunction, auth: authEntries });
 
-  const info = await server.getAccount(source.publicKey());
-  const account = new Account(source.publicKey(), info.sequenceNumber());
-  let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: NETWORK })
-    .addOperation(op)
-    .setTimeout(30)
-    .build();
+  // This tx is sourced from the relayer, so its sequence number collides with the faucet
+  // seed / pool funding / wallet seed txs that run during the same onboarding. Serialize on
+  // the relayer account and hold through landing so the sequence is consumed before the next
+  // relayer tx builds. See accountLock.ts in the SDK.
+  return withAccountLock(source.publicKey(), async () => {
+    const info = await server.getAccount(source.publicKey());
+    const account = new Account(source.publicKey(), info.sequenceNumber());
+    let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: NETWORK })
+      .addOperation(op)
+      .setTimeout(30)
+      .build();
 
-  const sim = await server.simulateTransaction(tx);
-  if (!rpc.Api.isSimulationSuccess(sim)) {
-    throw new Error(`relay simulation failed: ${JSON.stringify(sim)}`);
-  }
-  tx = rpc.assembleTransaction(tx, sim).build();
-  tx.sign(source);
-  return submitAssembledTx(tx);
+    const sim = await server.simulateTransaction(tx);
+    if (!rpc.Api.isSimulationSuccess(sim)) {
+      throw new Error(`relay simulation failed: ${JSON.stringify(sim)}`);
+    }
+    tx = rpc.assembleTransaction(tx, sim).build();
+    tx.sign(source);
+    const hash = await submitAssembledTx(tx);
+    await waitForLanding(server, hash);
+    return hash;
+  });
 }
 
 /** Entry point for POST /wallet/relay — routes the kit's relayer payload to the right submitter. */

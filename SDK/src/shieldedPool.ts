@@ -4,6 +4,7 @@ import {
 } from '@stellar/stellar-sdk';
 import { SerializedProof } from './groth16Prover';
 import { Signer } from './types';
+import { withAccountLock, waitForLanding } from './accountLock';
 
 const bytesScVal = (u8: Uint8Array) => xdr.ScVal.scvBytes(Buffer.from(u8));
 const signalsScVal = (sigs: Uint8Array[]) => xdr.ScVal.scvVec(sigs.map(bytesScVal));
@@ -57,15 +58,7 @@ export class ShieldedPoolClient {
 
     /** Poll until a tx hash is confirmed on-chain (or throw on failure/timeout). */
     async waitForLanding(hash: string, timeoutMs = 180_000): Promise<void> {
-        const deadline = Date.now() + timeoutMs;
-        while (Date.now() < deadline) {
-            const r = await this.server.getTransaction(hash);
-            if (r.status === rpc.Api.GetTransactionStatus.SUCCESS) return;
-            if (r.status === rpc.Api.GetTransactionStatus.FAILED)
-                throw new Error(`[ShieldedPoolClient] tx ${hash} failed on-chain`);
-            await new Promise(resolve => setTimeout(resolve, 1500));
-        }
-        throw new Error(`[ShieldedPoolClient] tx ${hash} not confirmed within ${timeoutMs}ms`);
+        return waitForLanding(this.server, hash, timeoutMs);
     }
 
     /** Trustless tree append: verifies a merkle_insert proof on-chain. */
@@ -133,31 +126,38 @@ export class ShieldedPoolClient {
     }
 
     private async invokeKeypair(kp: Keypair, method: string, ...args: xdr.ScVal[]): Promise<string> {
-        const MAX_ATTEMPTS = 6;
-        let lastErr: Error = new Error(`[ShieldedPoolClient] sendTransaction overloaded (${method}) — all retries exhausted`);
-        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-            if (attempt > 0) await new Promise(r => setTimeout(r, 3000 * attempt));
-            const info = await this.server.getAccount(kp.publicKey());
-            const account = new Account(kp.publicKey(), info.sequenceNumber());
-            let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
-                .addOperation(new Contract(this.contractId).call(method, ...args)).setTimeout(300).build();
-            const sim = await this.server.simulateTransaction(tx);
-            if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[ShieldedPoolClient] ${method} sim failed: ${JSON.stringify(sim)}`);
-            tx = rpc.assembleTransaction(tx, sim).build();
-            tx.sign(kp);
-            const sent = await this.server.sendTransaction(tx);
-            if (sent.status === 'ERROR') {
-                const detail = (sent as any).errorResult ? JSON.stringify((sent as any).errorResult) : 'unknown';
-                throw new Error(`[ShieldedPoolClient] sendTransaction rejected (${method}): ${detail}`);
+        // Serialize on the source account so concurrent relayer txs (faucet_seed, insert,
+        // claim_swap…) never collide on sequence numbers. The lock is held through landing so
+        // the next tx reads a sequence that has advanced past this one. See accountLock.ts.
+        return withAccountLock(kp.publicKey(), async () => {
+            const MAX_ATTEMPTS = 6;
+            let lastErr: Error = new Error(`[ShieldedPoolClient] sendTransaction overloaded (${method}) — all retries exhausted`);
+            for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+                if (attempt > 0) await new Promise(r => setTimeout(r, 3000 * attempt));
+                const info = await this.server.getAccount(kp.publicKey());
+                const account = new Account(kp.publicKey(), info.sequenceNumber());
+                let tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: this.networkPassphrase })
+                    .addOperation(new Contract(this.contractId).call(method, ...args)).setTimeout(300).build();
+                const sim = await this.server.simulateTransaction(tx);
+                if (!rpc.Api.isSimulationSuccess(sim)) throw new Error(`[ShieldedPoolClient] ${method} sim failed: ${JSON.stringify(sim)}`);
+                tx = rpc.assembleTransaction(tx, sim).build();
+                tx.sign(kp);
+                const sent = await this.server.sendTransaction(tx);
+                if (sent.status === 'ERROR') {
+                    const detail = (sent as any).errorResult ? JSON.stringify((sent as any).errorResult) : 'unknown';
+                    throw new Error(`[ShieldedPoolClient] sendTransaction rejected (${method}): ${detail}`);
+                }
+                if (sent.status === 'TRY_AGAIN_LATER') {
+                    lastErr = new Error(`[ShieldedPoolClient] sendTransaction overloaded (${method}) — attempt ${attempt + 1}/${MAX_ATTEMPTS}`);
+                    continue;
+                }
+                // DUPLICATE or PENDING: wait for the tx to actually land before releasing the
+                // lock, so the sequence number is consumed and visible to the next builder.
+                await this.waitForLanding(sent.hash);
+                return sent.hash;
             }
-            if (sent.status === 'DUPLICATE') return sent.hash;
-            if (sent.status === 'TRY_AGAIN_LATER') {
-                lastErr = new Error(`[ShieldedPoolClient] sendTransaction overloaded (${method}) — attempt ${attempt + 1}/${MAX_ATTEMPTS}`);
-                continue;
-            }
-            return sent.hash;
-        }
-        throw lastErr;
+            throw lastErr;
+        });
     }
 
     /** keypair (backend) or passkey (browser smart wallet) signing. */

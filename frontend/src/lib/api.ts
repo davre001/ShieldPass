@@ -21,12 +21,23 @@ export const api = {
   }) =>
     request<{
       success: boolean; tier: number; secretSalt: string; merkleRoot: string; leafIndex: number;
-      faucetNote?: {
-        amount: string; randomness: string; asset: string; leafIndex: number; commitment: string;
-        circuitInput: Record<string, unknown>;
+      // The faucet (new accounts only) settles on-chain in the BACKGROUND. When pending, the
+      // client keeps `faucetSecret` and polls faucetStatus; the shielded 500 is only shown once
+      // it settles (hide-until-settled). Absent for returning accounts.
+      faucetPending?: boolean;
+      faucetSecret?: {
+        amount: string; randomness: string; asset: string; commitment: string;
         compliance: { hardware_attested: string; bvn_verified: string; good_standing: string };
       };
     }>("/kyc/link-wallet", { method: "POST", body: JSON.stringify(input) }),
+
+  // Poll the background faucet settlement. 'settled' returns the reserved leaf + circuit input so
+  // the client can generate the merkle_insert proof; 'pending' means still settling.
+  faucetStatus: (commitment: string) =>
+    request<
+      | { state: "pending" }
+      | { state: "settled"; leafIndex: number; circuitInput: Record<string, unknown> }
+    >(`/kyc/faucet-status?commitment=${encodeURIComponent(commitment)}`),
 
   submitBvn: (input: { email: string; phone?: string; bvn: string }) =>
     request<{ success: boolean; tier: number; returnedName: string; secretSalt: string; merkleRoot: string; leafIndex: number }>(

@@ -13,3 +13,4 @@ export * from './circuitInputs';
 export * from './groth16Prover';
 export * from './shieldedPool';
 export * from './identity';
+export * from './accountLock';

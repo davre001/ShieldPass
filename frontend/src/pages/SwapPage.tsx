@@ -7,6 +7,7 @@ import ShieldedKeyGate from "../components/ShieldedKeyGate";
 import { useSwapProof } from "../lib/useSwapProof";
 import ErrorNotice from "../components/ErrorNotice";
 import { Buffer } from "buffer";
+import { encryptNote } from "@shieldpass/sdk/dist/identity";
 import type { BankAccount, Quote } from "../types";
 import { SUPPORTED_ASSETS as SUPPORTED_SWAP_ASSETS, assetByCode, parseUnits, formatUnits } from "../lib/assets";
 import { addBank, loadBanks } from "../lib/bankVault";
@@ -276,6 +277,25 @@ export default function SwapPage() {
           confirmed: true, // change leaf already inserted on-chain (changeLeafIndex resolved)
         }] : [];
         session.set({ notes: [...session.notes.filter((n) => n !== currentNote), ...changeNotes] });
+
+        // Publish a SELF-addressed recovery blob for the change note so the shielded balance
+        // survives logout / a new device (the note scanner rebuilds from these blobs).
+        if (BigInt(pr.changeNote.amount) > 0n && session.identity) {
+          try {
+            const plaintext = new TextEncoder().encode(JSON.stringify({
+              amount: pr.changeNote.amount, randomness: pr.changeNote.randomness,
+              compliance: currentNote.compliance, asset: token.code,
+            }));
+            const enc = encryptNote(session.identity.encPublic, plaintext);
+            await api.postNoteBlob({
+              commitment: changeCommitment,
+              ephemeralPub: Buffer.from(enc.ephemeralPublic).toString("hex"),
+              ciphertext: Buffer.from(enc.ciphertext).toString("hex"),
+            });
+          } catch (e) {
+            console.warn("[swap] change recovery blob publish failed:", e);
+          }
+        }
       }
 
       setSwapSuccess({ message: `Success! ${exec.message}`, txHash: swapRes.hash });

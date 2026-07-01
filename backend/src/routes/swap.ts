@@ -114,28 +114,29 @@ router.post('/execute', async (req, res) => {
   });
 
   // 3. Pay the Naira out to the user's bank account ephemerally.
-  let transfer: LencoTransferResult = await initiatePaystackTransfer({
+  // Lenco is the primary payout provider; Paystack is the fallback if Lenco fails.
+  let transfer: LencoTransferResult = await initiateLencoTransfer({
     amountNaira: quote.nairaAmount,
     accountNumber: accountNumber,
-    bankCode: NIGERIAN_BANKS.find(b => b.name === bankName)?.code, 
+    bankCode: NIGERIAN_BANKS.find(b => b.name === bankName)?.code,
     bankName: bankName,
     accountName: accountName,
-    reference: `ps_${swap.id}`, 
+    reference: `lc_${swap.id}`,
   });
 
-  let processorUsed = 'Paystack';
+  let processorUsed = 'Lenco';
 
   if (!transfer.ok || transfer.status === 'failed') {
-    console.warn(`[swap/execute] Paystack failed: ${transfer.error}. Falling back to Lenco...`);
-    transfer = await initiateLencoTransfer({
+    console.warn(`[swap/execute] Lenco failed: ${transfer.error}. Falling back to Paystack...`);
+    transfer = await initiatePaystackTransfer({
       amountNaira: quote.nairaAmount,
       accountNumber: accountNumber,
       bankCode: NIGERIAN_BANKS.find(b => b.name === bankName)?.code,
       bankName: bankName,
       accountName: accountName,
-      reference: `lc_${swap.id}`, 
+      reference: `ps_${swap.id}`,
     });
-    processorUsed = 'Lenco';
+    processorUsed = 'Paystack';
   }
 
   if (!transfer.ok || transfer.status === 'failed') {
