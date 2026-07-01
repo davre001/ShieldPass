@@ -81,6 +81,8 @@ export default function SwapPage() {
   const [accountName, setAccountName] = useState("");
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState<string | null>(null);
+  const [lencoBanks, setLencoBanks] = useState<{ code: string; name: string }[]>([]);
+  const [bankSearch, setBankSearch] = useState("");
   const [addingBank, setAddingBank] = useState(false);
   const [isBankDropdownOpen, setIsBankDropdownOpen] = useState(false);
   const [isSavedBankDropdownOpen, setIsSavedBankDropdownOpen] = useState(false);
@@ -98,6 +100,17 @@ export default function SwapPage() {
     .filter((n) => (n.asset || "XLM") === assetType)
     .reduce((sum, n) => sum + BigInt(n.amount), 0n);
   const shieldedSwapBalance = formatUnits(shieldedSwapTotal, selectedSwapAsset?.decimals ?? 7, 4);
+
+  // Load Lenco's full supported bank list (correct 6-digit codes) for the bank picker.
+  useEffect(() => {
+    api.banks().then((r) => setLencoBanks(r.banks || [])).catch(() => {});
+  }, []);
+
+  const bankNameByCode = (code?: string) => lencoBanks.find((b) => b.code === code)?.name || "";
+  const filteredBanks = (bankSearch.trim()
+    ? lencoBanks.filter((b) => b.name.toLowerCase().includes(bankSearch.trim().toLowerCase()))
+    : lencoBanks
+  ).slice(0, 60);
 
   useEffect(() => {
     if (session.email) {
@@ -154,13 +167,14 @@ export default function SwapPage() {
       setActionError("Enter a valid bank + 10-digit account number, and wait for the name to verify.");
       return;
     }
-    const bankName = NIGERIAN_BANKS.find(b => b.code === bankCode)?.name || bankCode;
+    const bankName = bankNameByCode(bankCode) || bankCode;
     try {
       setAddingBank(true);
 
       const newBank = {
         id: Math.random().toString(36).slice(2),
         bankName,
+        bankCode,
         accountNumber,
         accountName,
         isDefault: false,
@@ -172,6 +186,7 @@ export default function SwapPage() {
       setSelectedBankId(newBank.id);
       setShowAddBank(false);
       setBankCode("");
+      setBankSearch("");
       setAccountNumber("");
       setAccountName("");
     } catch (err) {
@@ -277,6 +292,7 @@ export default function SwapPage() {
           accountNumber: selectedBank.accountNumber,
           bankName: selectedBank.bankName,
           accountName: selectedBank.accountName,
+          bankCode: selectedBank.bankCode,
         },
         tokenAddress: token.sac,
         assetCode: token.code,
@@ -433,16 +449,13 @@ export default function SwapPage() {
                     className="w-full bg-white/5 backdrop-blur-md border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm cursor-pointer hover:bg-white/10 transition-colors flex items-center justify-between shadow-inner"
                     onClick={() => setIsBankDropdownOpen(!isBankDropdownOpen)}
                   >
-                    {bankCode ? (() => {
-                      const selBank = NIGERIAN_BANKS.find(b => b.code === bankCode);
-                      return (
-                        <div className="flex items-center gap-3">
-                          <img src={selBank?.logoUrl || `https://www.google.com/s2/favicons?domain=${selBank?.domain}&sz=128`} alt="" className="w-5 h-5 rounded-full bg-white/10 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
-                          <span className="font-medium">{selBank?.name}</span>
-                        </div>
-                      );
-                    })() : (
-                      <span className="text-white/50">Select Bank...</span>
+                    {bankCode ? (
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-indigo-500/30 text-[10px] flex items-center justify-center font-bold text-indigo-200 shrink-0">{(bankNameByCode(bankCode) || "?").charAt(0)}</span>
+                        <span className="font-medium truncate">{bankNameByCode(bankCode) || "Selected bank"}</span>
+                      </div>
+                    ) : (
+                      <span className="text-white/50">{lencoBanks.length ? "Select Bank..." : "Loading banks…"}</span>
                     )}
                     <svg className={`w-4 h-4 text-white/50 transition-transform duration-300 ${isBankDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                   </div>
@@ -452,21 +465,27 @@ export default function SwapPage() {
                       <motion.div
                         initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="w-full mt-2 bg-indigo-950/80 backdrop-blur-2xl border border-white/10 rounded-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar"
+                        className="w-full mt-2 bg-indigo-950/90 backdrop-blur-2xl border border-white/10 rounded-xl overflow-hidden"
                       >
-                        {NIGERIAN_BANKS.map(b => (
-                          <div
-                            key={b.code}
-                            className="px-4 py-3 hover:bg-white/10 cursor-pointer flex items-center gap-3 transition-colors border-b border-white/5 last:border-0"
-                            onClick={() => {
-                              setBankCode(b.code);
-                              setIsBankDropdownOpen(false);
-                            }}
-                          >
-                            <img src={b.logoUrl || `https://www.google.com/s2/favicons?domain=${b.domain}&sz=128`} alt={b.name} className="w-6 h-6 rounded-full bg-white/5 shadow-sm object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
-                            <span className="text-sm text-white/90 font-medium">{b.name}</span>
-                          </div>
-                        ))}
+                        <input
+                          autoFocus value={bankSearch} onChange={e => setBankSearch(e.target.value)}
+                          placeholder="Search bank…"
+                          className="w-full bg-white/5 border-b border-white/10 px-4 py-2.5 text-sm text-white outline-none placeholder:text-white/30"
+                        />
+                        <div className="max-h-56 overflow-y-auto custom-scrollbar">
+                          {filteredBanks.length === 0 ? (
+                            <div className="px-4 py-3 text-sm text-white/40">{lencoBanks.length ? "No match" : "Loading banks…"}</div>
+                          ) : filteredBanks.map(b => (
+                            <div
+                              key={b.code}
+                              className="px-4 py-3 hover:bg-white/10 cursor-pointer flex items-center gap-3 transition-colors border-b border-white/5 last:border-0"
+                              onClick={() => { setBankCode(b.code); setIsBankDropdownOpen(false); setBankSearch(""); }}
+                            >
+                              <span className="w-6 h-6 rounded-full bg-indigo-500/25 text-[11px] flex items-center justify-center font-bold text-indigo-200 shrink-0">{b.name.charAt(0)}</span>
+                              <span className="text-sm text-white/90 font-medium truncate">{b.name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -498,10 +517,9 @@ export default function SwapPage() {
                   >
                     {selectedBankId ? (() => {
                       const sel = banks.find(b => b.id === selectedBankId);
-                      const nBank = NIGERIAN_BANKS.find(n => n.name === sel?.bankName);
                       return (
-                        <div className="flex items-center gap-3">
-                          <img src={nBank?.logoUrl || `https://www.google.com/s2/favicons?domain=${nBank?.domain || 'bank.com'}&sz=128`} alt="" className="w-5 h-5 rounded-full bg-white/10 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-5 h-5 rounded-full bg-indigo-500/30 text-[10px] flex items-center justify-center font-bold text-indigo-200 shrink-0">{(sel?.bankName || "?").charAt(0)}</span>
                           <div className="flex flex-col min-w-0 leading-tight">
                             {sel?.accountName && <span className="font-medium truncate">{sel.accountName}</span>}
                             <span className={sel?.accountName ? "text-xs text-white/40" : "font-medium"}>{sel?.bankName} · {sel?.accountNumber}</span>
@@ -522,7 +540,6 @@ export default function SwapPage() {
                         className="w-full mt-2 bg-indigo-950/90 backdrop-blur-2xl border border-white/10 rounded-xl overflow-hidden max-h-60 overflow-y-auto custom-scrollbar"
                       >
                         {banks.map(b => {
-                          const nBank = NIGERIAN_BANKS.find(n => n.name === b.bankName);
                           return (
                             <div
                               key={b.id}
@@ -532,7 +549,7 @@ export default function SwapPage() {
                                 setIsSavedBankDropdownOpen(false);
                               }}
                             >
-                              <img src={nBank?.logoUrl || `https://www.google.com/s2/favicons?domain=${nBank?.domain || 'bank.com'}&sz=128`} alt="" className="w-6 h-6 rounded-full bg-white/5 shadow-sm object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                              <span className="w-6 h-6 rounded-full bg-indigo-500/25 text-[11px] flex items-center justify-center font-bold text-indigo-200 shrink-0">{(b.bankName || "?").charAt(0)}</span>
                               <div className="flex flex-col min-w-0 leading-tight">
                                 {b.accountName && <span className="text-sm text-white/90 font-medium truncate">{b.accountName}</span>}
                                 <span className={b.accountName ? "text-xs text-white/40" : "text-sm text-white/90 font-medium"}>{b.bankName} · {b.accountNumber}</span>

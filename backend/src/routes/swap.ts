@@ -7,7 +7,7 @@ import { treeServiceFor } from '../services/tree';
 import { poolIdForAsset, defaultPoolId } from '../services/pools';
 import { notify } from './notifications';
 import { getQuote, TIER2_THRESHOLD_NAIRA, type Quote } from '../services/quote';
-import { initiateTransfer as initiateLencoTransfer, resolveAccount, type LencoTransferResult } from '../services/lenco';
+import { initiateTransfer as initiateLencoTransfer, resolveAccount, getBanks, type LencoTransferResult } from '../services/lenco';
 import { initiatePaystackTransfer } from '../services/paystack';
 
 const router = Router();
@@ -53,6 +53,17 @@ const NIGERIAN_BANKS = [
 ];
 
 // POST /swap/quote - Naira payout for any Stellar asset + whether it needs Tier 2 (BVN).
+// GET /swap/banks - Lenco's bank list (correct 6-digit codes) for the withdraw form's bank picker.
+router.get('/banks', async (_req, res) => {
+  try {
+    const banks = await getBanks();
+    return res.json({ banks });
+  } catch (err) {
+    console.error('[swap/banks]', err);
+    return res.status(500).json({ error: 'Could not load banks.' });
+  }
+});
+
 // POST /swap/resolve-account - name enquiry: resolve account number + bank code to the account
 // holder's name so the user can confirm the recipient BEFORE paying (prevents wrong-account payouts).
 router.post('/resolve-account', async (req, res) => {
@@ -102,6 +113,9 @@ router.post('/execute', async (req, res) => {
   // We do not save or look up the bank account in the DB.
   // We use the ephemeral details passed directly from the client's local storage.
   const { accountNumber, bankName, accountName } = ephemeralBankDetails;
+  // Lenco/Paystack bank code — prefer the one the client resolved against Lenco's list (6-digit),
+  // falling back to a name lookup for legacy saved banks.
+  const bankCode: string | undefined = ephemeralBankDetails.bankCode || NIGERIAN_BANKS.find(b => b.name === bankName)?.code;
 
   // 1. Price the swap (the contract already enforced the tier gate on-chain).
   let quote: Quote;
@@ -129,7 +143,7 @@ router.post('/execute', async (req, res) => {
   let transfer: LencoTransferResult = await initiateLencoTransfer({
     amountNaira: quote.nairaAmount,
     accountNumber: accountNumber,
-    bankCode: NIGERIAN_BANKS.find(b => b.name === bankName)?.code,
+    bankCode: bankCode,
     bankName: bankName,
     accountName: accountName,
     reference: `lc_${swap.id}`,
@@ -142,7 +156,7 @@ router.post('/execute', async (req, res) => {
     transfer = await initiatePaystackTransfer({
       amountNaira: quote.nairaAmount,
       accountNumber: accountNumber,
-      bankCode: NIGERIAN_BANKS.find(b => b.name === bankName)?.code,
+      bankCode: bankCode,
       bankName: bankName,
       accountName: accountName,
       reference: `ps_${swap.id}`,

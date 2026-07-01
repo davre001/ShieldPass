@@ -56,6 +56,7 @@ export interface HistoryItem extends Trade {
 export interface BankAccount {
   id: string;
   bankName: string;
+  bankCode?: string;      // Lenco's 6-digit code (used for name enquiry + payout)
   accountNumber: string;
   accountName: string;
   isDefault: boolean;

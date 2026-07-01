@@ -61,9 +61,12 @@ export const api = {
   resolveAccount: (input: { accountNumber: string; bankCode: string }) =>
     request<{ accountName: string }>("/swap/resolve-account", { method: "POST", body: JSON.stringify(input) }),
 
+  // Lenco's full supported bank list (correct 6-digit codes) for the withdraw bank picker.
+  banks: () => request<{ banks: { code: string; name: string }[] }>("/swap/banks"),
+
   executeSwap: (input: {
     email: string;
-    ephemeralBankDetails: { accountNumber: string; bankName: string; accountName: string };
+    ephemeralBankDetails: { accountNumber: string; bankName: string; accountName: string; bankCode?: string };
     tokenAddress: string; cryptoAmount: number; cryptoAmountUnits: string; assetCode?: string;
     onChainSwapId: string; nullifier?: string; changeCommitment?: string;
   }) => request<{ success: boolean; swap: SwapRecord; changeLeafIndex: number | null; payout: { amountNaira: number; bank: string; transferId: string }; message: string }>(

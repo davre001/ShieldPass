@@ -45,29 +45,33 @@ export async function initiateTransfer(input: LencoTransferInput): Promise<Lenco
   }
 
   try {
-    const res = await fetch(`${LENCO_API_URL}/transactions`, {
+    // Lenco create-transfer: POST /transfer with a FLAT body (accountNumber + bankCode at top level),
+    // amount as a STRING, and a reference limited to [A-Za-z0-9-._].
+    const res = await fetch(`${LENCO_API_URL}/transfer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LENCO_API_KEY}` },
       body: JSON.stringify({
         accountId: LENCO_ACCOUNT_ID,
-        amount: input.amountNaira,
-        currency: 'NGN',
-        narration: `ShieldPass swap ${input.reference}`,
+        amount: String(input.amountNaira),
+        narration: `ShieldPass ${input.reference}`.slice(0, 100),
         reference: input.reference,
-        recipient: {
-          accountNumber: input.accountNumber,
-          bankCode: input.bankCode,
-          accountName: input.accountName,
-        },
+        accountNumber: input.accountNumber,
+        bankCode: input.bankCode,
       }),
     });
-    const data = await res.json().catch(() => ({}));
+    const data: any = await res.json().catch(() => ({}));
     if (!res.ok) {
       return { ok: false, transferId: '', status: 'failed', error: data?.message || `Lenco error ${res.status}` };
     }
-    const tx = data?.data ?? data;
-    const status = (tx?.status as LencoTransferResult['status']) || 'pending';
-    return { ok: status !== 'failed', transferId: String(tx?.id || tx?.reference || input.reference), status };
+    const d = data?.data ?? {};
+    // request status is queued|created; transaction status is successful|pending|failed|declined|reversed
+    const raw = String(d?.transaction?.status || d?.request?.status || 'pending').toLowerCase();
+    const status: LencoTransferResult['status'] =
+      raw === 'successful' ? 'successful'
+        : (raw === 'failed' || raw === 'declined' || raw === 'reversed') ? 'failed'
+          : 'pending';
+    const transferId = String(d?.transaction?.id || d?.request?.id || d?.id || input.reference);
+    return { ok: status !== 'failed', transferId, status };
   } catch (err) {
     return { ok: false, transferId: '', status: 'failed', error: err instanceof Error ? err.message : String(err) };
   }
@@ -94,5 +98,26 @@ export async function resolveAccount(accountNumber: string, bankCode: string): P
     return { ok: true, accountName: String(name) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+let _banksCache: { code: string; name: string }[] | null = null;
+
+/**
+ * Lenco's bank list — the source of truth for bank codes (Lenco uses 6-digit NIP codes like
+ * "000023", NOT the 3-digit CBN codes). The withdraw form must use these so /resolve and /transfer
+ * receive a code Lenco accepts. Cached in memory for the process lifetime.
+ */
+export async function getBanks(): Promise<{ code: string; name: string }[]> {
+  if (_banksCache) return _banksCache;
+  if (!LENCO_API_KEY) return [];
+  try {
+    const res = await fetch(`${LENCO_API_URL}/banks`, { headers: { Authorization: `Bearer ${LENCO_API_KEY}` } });
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(data?.data)) return [];
+    _banksCache = data.data.map((b: any) => ({ code: String(b.code), name: String(b.name) }));
+    return _banksCache!;
+  } catch {
+    return [];
   }
 }
