@@ -1,0 +1,28 @@
+{
+  "name": "docs-site",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 5000",
+    "build": "next build",
+    "postbuild": "pagefind --site out",
+    "start": "next start -p 5000",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@types/node": "^20.19.43",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "next": "15.1.0",
+    "nextra": "^4.6.1",
+    "nextra-theme-docs": "^4.6.1",
+    "pagefind": "^1.5.2",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "typescript": "^5"
+  },
+  "devDependencies": {
+    "eslint": "^9",
+    "eslint-config-next": "15.1.0"
+  }
+}
