@@ -44,4 +44,4 @@ hh
 # Circom build workspace — intermediates (ptau, zkeys, wasm); runtime copies live in backend/circuits + frontend/public
 SDK/circom/build/
 *.ptau
- docs-site/package-lock.json
+docs-site/package-lock.json
